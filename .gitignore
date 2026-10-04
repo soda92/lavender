@@ -31,3 +31,7 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# extracted game assets (2 GB) and extracted disc image
+/extracted_data/
+/disc/
