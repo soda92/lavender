@@ -1,0 +1,214 @@
+import React, { useMemo } from 'react';
+import { mediaUrl, renderCharacter, timeDef } from '../game/metadata';
+import type { StageState, CharState, DynLayer } from '../hooks/useKagRunner';
+
+const STAGE_W = 800;
+const STAGE_H = 600;
+
+function bgFilter(stage: StageState): string {
+  const f: string[] = [];
+  if (stage.bg) {
+    const td = timeDef(stage.bg.time);
+    if (td?.brightness) f.push(`brightness(${1 + td.brightness / 100})`);
+    if (td?.contrast) f.push(`contrast(${1 + td.contrast / 100})`);
+  }
+  if (stage.envAdjust?.grayscale) f.push('grayscale(1)');
+  return f.join(' ');
+}
+
+const CharacterView: React.FC<{ ch: CharState }> = ({ ch }) => {
+  const rendered = useMemo(
+    () => renderCharacter(ch.name, {
+      pose: ch.pose,
+      dress: ch.dress,
+      diff: ch.diff,
+      face: ch.face,
+      level: ch.level,
+    }),
+    [ch.name, ch.pose, ch.dress, ch.diff, ch.face, ch.level],
+  );
+  if (!rendered) return null;
+
+  // Level-1 art fills the stage height; level-2 close-ups overflow it.
+  const d = (STAGE_H * rendered.scale) / rendered.canvas[1];
+  const w = rendered.canvas[0] * d;
+  const left = STAGE_W / 2 + ch.xpos - w / 2;
+
+  return (
+    <div
+      className="char-sprite"
+      style={{
+        position: 'absolute',
+        bottom: 0,
+        left,
+        width: w,
+        height: STAGE_H,
+        opacity: ch.opacity != null ? ch.opacity / 255 : 1,
+        zIndex: ch.front ? 40 : 20,
+      }}
+    >
+      {rendered.body && (
+        <img
+          src={rendered.body.url}
+          alt=""
+          draggable={false}
+          style={{
+            position: 'absolute',
+            left: (rendered.body.x + rendered.offsetX) * d,
+            top: (rendered.body.y + rendered.offsetY) * d,
+            width: rendered.body.w * d,
+            height: rendered.body.h * d,
+            opacity: rendered.body.opacity,
+          }}
+        />
+      )}
+      {rendered.face && (
+        <img
+          src={rendered.face.url}
+          alt=""
+          draggable={false}
+          style={{
+            position: 'absolute',
+            left: (rendered.face.x + rendered.offsetX) * d,
+            top: (rendered.face.y + rendered.offsetY) * d,
+            width: rendered.face.w * d,
+            height: rendered.face.h * d,
+            opacity: rendered.face.opacity,
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+const LayerView: React.FC<{ layer: DynLayer }> = ({ layer }) => {
+  if (!layer.file) return null;
+  const url = mediaUrl(layer.file);
+  if (!url) return null;
+  const centered = layer.xpos == null && layer.ypos == null;
+  return (
+    <img
+      src={url}
+      alt=""
+      draggable={false}
+      className="dyn-layer"
+      style={{
+        position: 'absolute',
+        opacity: layer.opacity / 255,
+        display: layer.visible ? 'block' : 'none',
+        zIndex: layer.front ? 30 + layer.level : 10 + layer.level,
+        ...(centered
+          ? { left: 0, top: 0, width: STAGE_W, height: STAGE_H, objectFit: 'contain' }
+          : {
+              left: `calc(50% + ${layer.xpos ?? 0}px)`,
+              top: `calc(50% + ${layer.ypos ?? 0}px)`,
+              transform: 'translate(-50%, -50%)',
+              maxWidth: STAGE_W,
+              maxHeight: STAGE_H,
+            }),
+      }}
+    />
+  );
+};
+
+interface Props {
+  runner: any;
+}
+
+const GameplayScreen: React.FC<Props> = ({ runner }) => {
+  const {
+    stage, speaker, typewriterText, dialogueText, isWaiting, textVisible,
+    advance, choiceOptions, chooseOption, chapterCard,
+    setShowSettings, setShowHistory, isAutoMode, toggleAuto,
+    isFastForward, toggleFastForward, quickLoad, saveToSlot,
+  } = runner;
+
+  const chars = Object.values(stage.chars as Record<string, CharState>).filter(c => c.visible);
+  const layers = Object.values(stage.layers as Record<string, DynLayer>).filter(l => l.visible);
+  const bgStem = stage.bgHidden ? null : stage.bg?.stem;
+  const bgUrl = bgStem ? mediaUrl(bgStem) : '';
+  const shownText = typewriterText || (isWaiting ? dialogueText : dialogueText);
+
+  return (
+    <div
+      className="game-stage-root"
+      data-scenario={(runner as any).currentScenario}
+      data-pointer={(runner as any).pointer}
+    >
+    <div
+      className={`game-stage ${stage.quake ? 'quake' : ''}`}
+      style={{
+        width: STAGE_W, height: STAGE_H, position: 'relative', overflow: 'hidden', background: '#000',
+        ...(stage.quake
+          ? ({ '--qx': `${stage.quake.h}px`, '--qy': `${stage.quake.v}px` } as React.CSSProperties)
+          : {}),
+      }}
+      onClick={() => advance()}
+    >
+      {/* background */}
+      {bgUrl && (
+        <img
+          src={bgUrl}
+          alt=""
+          draggable={false}
+          style={{
+            position: 'absolute', inset: 0, width: '100%', height: '100%',
+            objectFit: 'cover', filter: bgFilter(stage), zIndex: 0,
+          }}
+        />
+      )}
+
+      {/* back layers */}
+      {layers.filter(l => !l.front).map(l => <LayerView key={l.name} layer={l} />)}
+
+      {/* characters */}
+      {chars.filter(c => !c.front).map(c => <CharacterView key={c.name} ch={c} />)}
+
+      {/* front layers */}
+      {layers.filter(l => l.front).map(l => <LayerView key={l.name} layer={l} />)}
+      {chars.filter(c => c.front).map(c => <CharacterView key={c.name} ch={c} />)}
+
+      {/* chapter card */}
+      {chapterCard && (
+        <div className="chapter-card" key={chapterCard.key}>
+          <div className="chapter-card-title">{chapterCard.title}</div>
+        </div>
+      )}
+
+      {/* choices */}
+      {choiceOptions && (
+        <div className="choices-overlay" onClick={e => e.stopPropagation()}>
+          {choiceOptions.map((opt: any, i: number) => (
+            <button key={i} className="choice-btn" onClick={() => chooseOption(opt)}>
+              {opt.text}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* dialogue */}
+      {textVisible && (shownText || speaker) && !choiceOptions && (
+        <div className={`dialogue-box ${!shownText ? 'empty' : ''}`}>
+          {speaker && <div className="speaker-plate">{speaker}</div>}
+          <div className="dialogue-text">{shownText}</div>
+          {isWaiting && typewriterText === dialogueText && dialogueText && (
+            <div className="click-glyph">▼</div>
+          )}
+        </div>
+      )}
+
+      {/* controls */}
+      <div className="stage-controls" onClick={e => e.stopPropagation()}>
+        <button title="Auto" className={isAutoMode ? 'active' : ''} onClick={toggleAuto}>自動</button>
+        <button title="Skip" className={isFastForward ? 'active' : ''} onClick={toggleFastForward}>スキップ</button>
+        <button title="Backlog" onClick={() => setShowHistory(true)}>履歴</button>
+        <button title="Quick Load" onClick={quickLoad}>Q.Load</button>
+        <button title="Quick Save" onClick={() => saveToSlot('q')}>Q.Save</button>
+        <button title="Settings" onClick={() => setShowSettings(true)}>設定</button>
+      </div>
+    </div>
+    </div>
+  );
+};
+
+export default GameplayScreen;
