@@ -223,6 +223,10 @@ export function resolveRegisteredName(name: string): string {
   const m = cache;
   if (!m) return name;
   if (m.charmeta.characters[name]) return name;
+  // Runtime aliases registered by [newchar] (def.nameAlias points at the
+  // character whose art/voice config is inherited).
+  const alias = (m.envinit.characters[name] as any)?.nameAlias;
+  if (alias && alias !== name) return resolveRegisteredName(alias);
   for (const [reg, def] of Object.entries(m.envinit.characters)) {
     if ((def as any).nameAlias === name) return reg;
   }
@@ -357,5 +361,5 @@ export function findLabelIndex(instructions: any[], label: string): number {
   const idx = instructions.findIndex(
     i => i.type === 'label' && (i.name === bare || i.name === label),
   );
-  return idx >= 0 ? idx : 0;
+  return idx; // -1 when missing; callers must NOT fall back to 0
 }

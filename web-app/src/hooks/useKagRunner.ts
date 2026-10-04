@@ -47,8 +47,17 @@ export interface EnvAdjust {
   bgamma?: number;
 }
 
+export interface BgEffect {
+  zoom?: number;   // percent
+  xpos?: number;
+  ypos?: number;
+  blur?: number;
+  brightness?: number;
+}
+
 export interface StageState {
   bg: { stem: string; time: string } | null;
+  bgEffect: BgEffect;
   bgHidden: boolean;
   chars: Record<string, CharState>;
   layers: Record<string, DynLayer>;
@@ -91,6 +100,7 @@ interface SaveSlot {
 
 const EMPTY_STAGE: StageState = {
   bg: null,
+  bgEffect: {},
   bgHidden: false,
   chars: {},
   layers: {},
@@ -156,6 +166,8 @@ export function useKagRunner(audio: {
   const [bgmStem, setBgmStem] = useState<string | null>(null);
   const [currentVoice, setCurrentVoice] = useState('');
   const [chapterCard, setChapterCard] = useState<{ title: string; key: number } | null>(null);
+  const [video, setVideo] = useState<{ stem: string } | null>(null);
+  const videoRef = useRef<{ stem: string } | null>(null);
   const [historyLog, setHistoryLog] = useState<HistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -202,7 +214,13 @@ export function useKagRunner(audio: {
   const bgmRef = useRef<string | null>(null);
   const textVisibleRef = useRef(true);
   const historyRef = useRef<HistoryItem[]>([]);
-  const clientIdRef = useRef<string>(Math.random().toString(36).slice(2));
+  const storagePrefix = 'lavender';
+  // Stable across reloads but per-tab (sessionStorage): a reloaded tab is the
+  // same client, while two genuinely different tabs keep distinct IDs.
+  const clientIdRef = useRef<string>(
+    sessionStorage.getItem(`${storagePrefix}_cid`) ||
+      (() => { const id = Math.random().toString(36).slice(2); sessionStorage.setItem(`${storagePrefix}_cid`, id); return id; })(),
+  );
   const usernameRef = useRef('default');
   const quakeTimerRef = useRef<any>(null);
 
@@ -212,7 +230,13 @@ export function useKagRunner(audio: {
   useEffect(() => { autoRef.current = isAutoMode; }, [isAutoMode]);
   useEffect(() => { fastRef.current = isFastForward; }, [isFastForward]);
 
-  const storagePrefix = 'lavender';
+  // Surface progress in the URL fragment for debugging / quick inspection.
+  useEffect(() => {
+    if (gameState === 'PLAYING') {
+      const hash = `#/${currentScenario}/${pointer}`;
+      window.history.replaceState(null, '', hash);
+    }
+  }, [gameState, currentScenario, pointer]);
 
   // ---- metadata + heartbeat + state hydration ----
   useEffect(() => {
@@ -223,7 +247,7 @@ export function useKagRunner(audio: {
       setMetaReady(true);
       hydrate();
     });
-    const hb = setInterval(() => {
+    const beat = () => {
       fetch('/api/heartbeat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -231,17 +255,27 @@ export function useKagRunner(audio: {
       }).then(r => r.json()).then(j => {
         if (j.status === 'conflict') setSessionConflict(true);
       }).catch(() => {});
-    }, 4000);
+    };
+    beat();
+    const hb = setInterval(beat, 4000);
     return () => { alive = false; clearInterval(hb); };
   }, []);
 
+  const sfFlushTimer = useRef<any>(null);
   const persistSf = useCallback((next: Record<string, any>) => {
     localStorage.setItem(`${storagePrefix}_sf`, JSON.stringify(next));
-    fetch('/api/save-sf', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Username': usernameRef.current },
-      body: JSON.stringify({ sf: next }),
-    }).catch(() => {});
+    clearTimeout(sfFlushTimer.current);
+    sfFlushTimer.current = setTimeout(() => {
+      fetch('/api/save-sf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Username': usernameRef.current,
+          'X-Client-ID': clientIdRef.current,
+        },
+        body: JSON.stringify({ sf: next }),
+      }).catch(() => {});
+    }, 400);
   }, []);
 
   const setSf = useCallback((updater: any) => {
@@ -324,7 +358,11 @@ export function useKagRunner(audio: {
     setCurrentScenario(name);
     let start = 0;
     if (ptr != null) start = ptr;
-    else if (label) start = findLabelIndex(data, label);
+    else if (label) {
+      const idx = findLabelIndex(data, label);
+      if (idx >= 0) start = idx;
+      else console.warn('entry label missing:', label, 'in', name);
+    }
     ptrRef.current = start;
     setPointer(start);
   };
@@ -334,12 +372,12 @@ export function useKagRunner(audio: {
     label: string | null = null,
     overridePtr: number | null = null,
     opts: { autostart?: boolean } = { autostart: true },
-  ) => {
+  ): Promise<boolean> => {
     const url = scenarioPath(storage);
     const res = await fetch(url);
     if (!res.ok) {
-      console.error('failed to load scenario', storage);
-      return;
+      console.error('failed to load scenario', storage, url);
+      return false;
     }
     const json = await res.json();
     const name = (json.storage || storage).replace(/\.ks$/i, '');
@@ -352,6 +390,7 @@ export function useKagRunner(audio: {
       runningRef.current = false;
       void runSlice();
     }
+    return true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -364,6 +403,9 @@ export function useKagRunner(audio: {
     setTf({}); tfRef.current = {};
     setSpeaker(''); speakerRef.current = '';
     setDialogueText(''); setTypewriterText('');
+    setIsFastForward(false); fastRef.current = false;
+    rangeSkipRef.current = false;
+    setIsAutoMode(false); autoRef.current = false;
     setGameState('PLAYING');
     playBgmTrack(null);
     void loadScenario('lave01.ks');
@@ -480,22 +522,26 @@ export function useKagRunner(audio: {
         return 'continue';
       }
       if (args.storage) {
-        await loadScenario(String(args.storage), args.target ? String(args.target) : null, null, { autostart: false });
+        const ok = await loadScenario(String(args.storage), args.target ? String(args.target) : null, null, { autostart: false });
+        if (!ok) return 'continue';
       }
-      else if (args.target) jumpToLabel(String(args.target));
+      else if (args.target) {
+        if (!jumpToLabel(String(args.target))) return 'continue';
+      }
       return 'jump';
     }
     if (name === 'fastskip' && args.target) {
       // Acceleration marker: only warps while the player is actively skipping.
-      if (fastRef.current) {
-        jumpToLabel(String(args.target));
-        return 'jump';
+      if (!fastRef.current) return 'continue';
+      if (args.storage) {
+        const ok = await loadScenario(String(args.storage), String(args.target), null, { autostart: false });
+        return ok ? 'jump' : 'continue';
       }
-      return 'continue';
+      return jumpToLabel(String(args.target)) ? 'jump' : 'continue';
     }
     if (name === 'gotostart') {
-      await loadScenario('start.ks', null, null, { autostart: false });
-      return 'jump';
+      const ok = await loadScenario('start.ks', null, null, { autostart: false });
+      return ok ? 'jump' : 'continue';
     }
     if (name === 'eval') {
       sandboxExec(String(inst.exp || ''));
@@ -523,6 +569,7 @@ export function useKagRunner(audio: {
       for (const t of argv) if (envinitRef.current?.times[t]) time = t;
       if (args.stime && envinitRef.current?.times[args.stime]) time = args.stime;
       world.bg = { stem: stageStem(name, time), time };
+      world.bgEffect = {}; // a new stage resets the camera
       world.bgHidden = false;
       markBgSeen(world.bg.stem);
       commitStage();
@@ -535,7 +582,19 @@ export function useKagRunner(audio: {
     }
     if (name === 'bg') {
       const stem = args.file || args.storage || args.str;
-      if (stem) { world.bg = { stem: String(stem).replace(/\.\w+$/, ''), time: world.bg?.time || '昼' }; world.bgHidden = false; }
+      if (stem) {
+        world.bg = { stem: String(stem).replace(/\.\w+$/, ''), time: world.bg?.time || '昼' };
+        world.bgEffect = {};
+        world.bgHidden = false;
+      } else {
+        // Background camera / filter control (never sets an image).
+        const eff: BgEffect = { ...world.bgEffect };
+        for (const k of ['zoom', 'xpos', 'ypos', 'blur', 'brightness'] as const) {
+          if (args[k] != null && args[k] !== '') eff[k] = parseFloat(String(args[k]));
+        }
+        world.bgEffect = eff;
+      }
+      commitStage();
       return 'continue';
     }
     if (name === 'hidebase') { world.bgHidden = true; commitStage(); return 'continue'; }
@@ -595,6 +654,17 @@ export function useKagRunner(audio: {
     }
 
     // ---- characters ----
+    if (name === 'newchar') {
+      // Runtime character alias (e.g. アキナの姉 inherits アキナ's art/voice).
+      const env = envinitRef.current;
+      if (env && args.name && args.initname) {
+        env.characters[String(args.name)] = {
+          ...(env.characters[String(args.initname)] || {}),
+          nameAlias: String(args.initname),
+        };
+      }
+      return 'continue';
+    }
     if (isCharTag(name)) {
       handleCharacterTag(name, args, argv);
       commitStage();
@@ -680,6 +750,30 @@ export function useKagRunner(audio: {
       return 'stop';
     }
 
+    // ---- video ----
+    if (name === 'sysmovie') {
+      if (args.state === 'end' || (!args.storage && argv.length === 0)) {
+        videoRef.current = null;
+        setVideo(null);
+        return 'continue';
+      }
+      if (args.storage) {
+        // Skipping through: do not play the movie.
+        if (fastRef.current || rangeSkipRef.current) return 'continue';
+        setIsAutoMode(false); autoRef.current = false;
+        playBgmTrack(null); // the movie carries its own audio
+        const v = { stem: String(args.storage) };
+        videoRef.current = v;
+        setVideo(v);
+        return 'stop';
+      }
+    }
+    if (name === 'stopvideo') {
+      videoRef.current = null;
+      setVideo(null);
+      return 'continue';
+    }
+
     // ---- chapter cards ----
     if (name === 'intermission') {
       if (args.state === 'clear') setChapterCard(null);
@@ -688,6 +782,27 @@ export function useKagRunner(audio: {
     }
     if (name === 'chaptitle') {
       if (argv.includes('hide')) setChapterCard(null);
+      return 'continue';
+    }
+
+    // ---- system navigation ----
+    if (name === 'sysjump' && String(args.to || '') === 'title') {
+      playBgmTrack(null);
+      stageRef.current = structuredClone(EMPTY_STAGE);
+      commitStage();
+      setIsFastForward(false); fastRef.current = false;
+      rangeSkipRef.current = false;
+      setIsAutoMode(false); autoRef.current = false;
+      choiceOpenRef.current = false;
+      setChoiceOptions(null);
+      setChapterCard(null);
+      setTextVisible(true); textVisibleRef.current = true;
+      setGameState('TITLE');
+      return 'stop';
+    }
+    if (name === 'cancelautomode') {
+      setIsAutoMode(false);
+      autoRef.current = false;
       return 'continue';
     }
 
@@ -738,12 +853,17 @@ export function useKagRunner(audio: {
     }
   };
 
-  const jumpToLabel = (target: string) => {
+  const jumpToLabel = (target: string): boolean => {
     const data = dataRef.current;
-    if (!data) return;
+    if (!data) return false;
     const idx = findLabelIndex(data, target);
+    if (idx < 0) {
+      console.warn('label not found:', target, 'in', scenarioRef.current);
+      return false;
+    }
     ptrRef.current = idx;
     setPointer(idx);
+    return true;
   };
 
   const markCgSeen = (file: string) => {
@@ -787,10 +907,13 @@ export function useKagRunner(audio: {
     }
   };
 
+  const trailRef = useRef<Array<[string, number, string]>>([]);
+
   const runSlice = useCallback(async () => {
     if (runningRef.current) return;
     runningRef.current = true;
     const myToken = ++runTokenRef.current;
+    let budget = 200000; // command watchdog: a single slice must not spin forever
     try {
       while (true) {
         if (myToken !== runTokenRef.current) break;
@@ -798,8 +921,22 @@ export function useKagRunner(audio: {
         if (!data) break;
         if (ptrRef.current >= data.length) break;
         if (choiceOpenRef.current) break;
+        if (--budget <= 0) {
+          console.error('runSlice watchdog tripped', {
+            scenario: scenarioRef.current,
+            pointer: ptrRef.current,
+            inst: data[ptrRef.current],
+            trail: trailRef.current.slice(-24),
+          });
+          break;
+        }
 
         const inst = data[ptrRef.current];
+        if (inst?.type === 'command') {
+          const trail = trailRef.current;
+          trail.push([scenarioRef.current, ptrRef.current, String(inst.name)]);
+          if (trail.length > 40) trail.shift();
+        }
 
         if (inst.type === 'label' || inst.type === 'comment') { ptrRef.current++; continue; }
         if (inst.type === 'line_feed') { ptrRef.current++; continue; }
@@ -889,9 +1026,24 @@ export function useKagRunner(audio: {
   // Player input
   // -------------------------------------------------------------------------
 
+  const endVideo = useCallback(() => {
+    if (!videoRef.current) return;
+    videoRef.current = null;
+    setVideo(null);
+    waitingRef.current = false;
+    setIsWaiting(false);
+    const data = dataRef.current;
+    if (data && ptrRef.current < data.length) {
+      ptrRef.current++;
+      setPointer(ptrRef.current);
+    }
+    void runSlice();
+  }, [runSlice]);
+
   const advance = useCallback(() => {
     if (gameState !== 'PLAYING') return;
     if (choiceOpenRef.current) return;
+    if (videoRef.current) { endVideo(); return; }
     if (typingRef.current) {
       finishTyping();
       return;
@@ -913,7 +1065,7 @@ export function useKagRunner(audio: {
     setIsWaiting(false);
     void runSlice();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState, runSlice]);
+  }, [gameState, runSlice, endVideo]);
 
   const chooseOption = useCallback((opt: ChoiceOption) => {
     choiceOpenRef.current = false;
@@ -929,8 +1081,7 @@ export function useKagRunner(audio: {
       } else if (opt.storage) {
         await loadScenario(opt.storage, opt.target);
       } else {
-        jumpToLabel(opt.target);
-        void runSlice();
+        if (jumpToLabel(opt.target)) void runSlice();
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1099,7 +1250,7 @@ export function useKagRunner(audio: {
     stage, speaker, dialogueText, typewriterText,
     isWaiting, textVisible, advance,
     choiceOptions, chooseOption,
-    chapterCard,
+    chapterCard, video, onVideoEnded: endVideo,
     bgmStem, currentVoice,
     historyLog, showHistory, setShowHistory, replayVoice,
     showSettings, setShowSettings,

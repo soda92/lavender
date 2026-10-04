@@ -12,8 +12,22 @@ function bgFilter(stage: StageState): string {
     if (td?.brightness) f.push(`brightness(${1 + td.brightness / 100})`);
     if (td?.contrast) f.push(`contrast(${1 + td.contrast / 100})`);
   }
+  const eff = stage.bgEffect || {};
+  if (eff.blur) f.push(`blur(${eff.blur}px)`);
+  if (eff.brightness != null) {
+    const v = Math.max(0, Math.min(2, 1 + eff.brightness / 255));
+    f.push(`brightness(${v})`);
+  }
   if (stage.envAdjust?.grayscale) f.push('grayscale(1)');
   return f.join(' ');
+}
+
+function bgTransform(stage: StageState): string {
+  const eff = stage.bgEffect || {};
+  const z = eff.zoom ? eff.zoom / 100 : 1;
+  const x = eff.xpos || 0;
+  const y = eff.ypos || 0;
+  return `translate(${x}px, ${y}px) scale(${z})`;
 }
 
 const CharacterView: React.FC<{ ch: CharState }> = ({ ch }) => {
@@ -118,7 +132,7 @@ interface Props {
 const GameplayScreen: React.FC<Props> = ({ runner }) => {
   const {
     stage, speaker, typewriterText, dialogueText, isWaiting, textVisible,
-    advance, choiceOptions, chooseOption, chapterCard,
+    advance, choiceOptions, chooseOption, chapterCard, video, onVideoEnded,
     setShowSettings, setShowHistory, isAutoMode, toggleAuto,
     isFastForward, toggleFastForward, quickLoad, saveToSlot,
   } = runner;
@@ -153,7 +167,8 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
           draggable={false}
           style={{
             position: 'absolute', inset: 0, width: '100%', height: '100%',
-            objectFit: 'cover', filter: bgFilter(stage), zIndex: 0,
+            objectFit: 'cover', filter: bgFilter(stage),
+            transform: bgTransform(stage), zIndex: 0,
           }}
         />
       )}
@@ -167,6 +182,24 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
       {/* front layers */}
       {layers.filter(l => l.front).map(l => <LayerView key={l.name} layer={l} />)}
       {chars.filter(c => c.front).map(c => <CharacterView key={c.name} ch={c} />)}
+
+      {/* opening movie */}
+      {video && (
+        <video
+          key={video.stem}
+          className="movie-layer"
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000', zIndex: 90 }}
+          src={`/video/${video.stem}.mp4`}
+          autoPlay
+          playsInline
+          onEnded={() => onVideoEnded()}
+          onError={(e) => {
+            // mp4 missing/unsupported: let the caller continue instead of hanging
+            console.warn('video playback failed', video.stem, e);
+            onVideoEnded();
+          }}
+        />
+      )}
 
       {/* chapter card */}
       {chapterCard && (
