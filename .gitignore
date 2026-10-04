@@ -35,3 +35,12 @@ go.work.sum
 # extracted game assets (2 GB) and extracted disc image
 /extracted_data/
 /disc/
+/bin/
+
+# runtime save database
+/saves/
+
+# built server binary
+/lavender-server
+/lavender-server.exe
+

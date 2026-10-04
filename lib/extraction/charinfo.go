@@ -240,7 +240,9 @@ func parseLayerManifest(path string) ([2]int, []spriteLayer, error) {
 			return ""
 		}
 		if lineNo == 2 {
-			canvas = [2]int{atoiOr(trim(2), 0), atoiOr(trim(3), 0)}
+			// logical line 2 keeps layer_type/name/left/top empty and puts
+			// canvas width/height in the width/height columns (4 and 5).
+			canvas = [2]int{atoiOr(trim(4), 0), atoiOr(trim(5), 0)}
 			return nil
 		}
 		if len(rec) < 10 || strings.HasPrefix(trim(0), "#") {
