@@ -129,36 +129,13 @@ interface Props {
   runner: any;
 }
 
-const GameplayScreen: React.FC<Props> = ({ runner }) => {
-  const {
-    stage, speaker, typewriterText, dialogueText, isWaiting, textVisible,
-    advance, choiceOptions, chooseOption, chapterCard, video, onVideoEnded,
-    setShowSettings, setShowHistory, isAutoMode, toggleAuto,
-    isFastForward, toggleFastForward, quickLoad, saveToSlot,
-  } = runner;
-
+const SceneView: React.FC<{ stage: StageState }> = ({ stage }) => {
   const chars = Object.values(stage.chars as Record<string, CharState>).filter(c => c.visible);
   const layers = Object.values(stage.layers as Record<string, DynLayer>).filter(l => l.visible);
   const bgStem = stage.bgHidden ? null : stage.bg?.stem;
   const bgUrl = bgStem ? mediaUrl(bgStem) : '';
-  const shownText = typewriterText || (isWaiting ? dialogueText : dialogueText);
-
   return (
-    <div
-      className="game-stage-root"
-      data-scenario={(runner as any).currentScenario}
-      data-pointer={(runner as any).pointer}
-    >
-    <div
-      className={`game-stage ${stage.quake ? 'quake' : ''}`}
-      style={{
-        width: STAGE_W, height: STAGE_H, position: 'relative', overflow: 'hidden', background: '#000',
-        ...(stage.quake
-          ? ({ '--qx': `${stage.quake.h}px`, '--qy': `${stage.quake.v}px` } as React.CSSProperties)
-          : {}),
-      }}
-      onClick={() => advance()}
-    >
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
       {/* background */}
       {bgUrl && (
         <img
@@ -182,6 +159,52 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
       {/* front layers */}
       {layers.filter(l => l.front).map(l => <LayerView key={l.name} layer={l} />)}
       {chars.filter(c => c.front).map(c => <CharacterView key={c.name} ch={c} />)}
+    </div>
+  );
+};
+
+const GameplayScreen: React.FC<Props> = ({ runner }) => {
+  const {
+    stage, stageTransition, speaker, typewriterText, dialogueText, isWaiting, textVisible,
+    advance, choiceOptions, chooseOption, chapterCard, video, onVideoEnded,
+    setShowSettings, setShowHistory, isAutoMode, toggleAuto,
+    isFastForward, toggleFastForward, quickLoad, saveToSlot,
+  } = runner;
+
+  const shownText = typewriterText || (isWaiting ? dialogueText : dialogueText);
+
+  return (
+    <div
+      className="game-stage-root"
+      data-scenario={(runner as any).currentScenario}
+      data-pointer={(runner as any).pointer}
+    >
+    <div
+      className={`game-stage ${stage.quake ? 'quake' : ''}`}
+      style={{
+        width: STAGE_W, height: STAGE_H, position: 'relative', overflow: 'hidden', background: '#000',
+        ...(stage.quake
+          ? ({ '--qx': `${stage.quake.h}px`, '--qy': `${stage.quake.v}px` } as React.CSSProperties)
+          : {}),
+      }}
+      onClick={() => advance()}
+    >
+      {/* current scene */}
+      <SceneView stage={stage} />
+
+      {/* transition overlay: previous scene animating out */}
+      {stageTransition && (
+        <div
+          key={stageTransition.key}
+          className={`trans-overlay ${stageTransition.cls}`}
+          style={{
+            position: 'absolute', inset: 0, zIndex: 45, pointerEvents: 'none',
+            animationDuration: `${stageTransition.ms}ms`,
+          }}
+        >
+          <SceneView stage={stageTransition.old} />
+        </div>
+      )}
 
       {/* opening movie */}
       {video && (

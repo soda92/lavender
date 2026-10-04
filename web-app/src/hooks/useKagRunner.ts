@@ -98,6 +98,30 @@ interface SaveSlot {
   historyLog?: HistoryItem[];
 }
 
+// Maps an Akabei endtrans method name to a CSS animation + default duration.
+// Custom mask rules (Japanese names) are approximated with directional slides.
+function transAnim(method: string): { cls: string; ms: number } {
+  if (method.includes('高速')) {
+    if (method.includes('左')) return { cls: 'tr-slide-l', ms: 250 };
+    if (method.includes('右')) return { cls: 'tr-slide-r', ms: 250 };
+    if (method.includes('上')) return { cls: 'tr-slide-u', ms: 250 };
+    return { cls: 'tr-slide-d', ms: 250 };
+  }
+  if (method.includes('右')) return { cls: 'tr-slide-r', ms: 500 };
+  if (method.includes('左')) return { cls: 'tr-slide-l', ms: 500 };
+  if (method.includes('上')) return { cls: 'tr-slide-u', ms: 500 };
+  if (method.includes('下')) return { cls: 'tr-slide-d', ms: 500 };
+  switch (method) {
+    case 'superquick': return { cls: 'tr-fade', ms: 120 };
+    case 'quickfade': return { cls: 'tr-fade', ms: 250 };
+    case 'normal': return { cls: 'tr-fade', ms: 300 };
+    case 'universal': return { cls: 'tr-fade', ms: 400 };
+    case 'midfade': return { cls: 'tr-fade', ms: 600 };
+    case 'longfade': return { cls: 'tr-fade', ms: 1000 };
+    default: return { cls: 'tr-fade', ms: 350 };
+  }
+}
+
 const EMPTY_STAGE: StageState = {
   bg: null,
   bgEffect: {},
@@ -157,6 +181,9 @@ export function useKagRunner(audio: {
   const [currentScenario, setCurrentScenario] = useState('start');
   const [pointer, setPointer] = useState(0);
   const [stage, setStage] = useState<StageState>(structuredClone(EMPTY_STAGE));
+  const [stageTransition, setStageTransition] = useState<{
+    old: StageState; cls: string; ms: number; key: number;
+  } | null>(null);
   const [speaker, setSpeaker] = useState('');
   const [dialogueText, setDialogueText] = useState('');
   const [typewriterText, setTypewriterText] = useState('');
@@ -223,6 +250,10 @@ export function useKagRunner(audio: {
   );
   const usernameRef = useRef('default');
   const quakeTimerRef = useRef<any>(null);
+  const transOpenRef = useRef(false);            // between begintrans/endtrans
+  const lastCommittedRef = useRef<StageState>(structuredClone(EMPTY_STAGE));
+  const transitionTimerRef = useRef<any>(null);
+  const transKeyRef = useRef(0);
 
   useEffect(() => { fRef.current = f; }, [f]);
   useEffect(() => { sfRef.current = sfState; }, [sfState]);
@@ -318,7 +349,13 @@ export function useKagRunner(audio: {
   // Stage mutation helpers
   // -------------------------------------------------------------------------
 
-  const commitStage = () => setStage(structuredClone(stageRef.current));
+  // Visual changes inside a begintrans/endtrans block mutate the draft but are
+  // committed once at endtrans; outside blocks commit immediately.
+  const commitStage = () => {
+    const next = structuredClone(stageRef.current);
+    lastCommittedRef.current = next;
+    if (!transOpenRef.current) setStage(next);
+  };
 
   const setQuake = (h: number, v: number, time: number) => {
     const key = Math.random();
@@ -353,6 +390,9 @@ export function useKagRunner(audio: {
   // -------------------------------------------------------------------------
 
   const applyScenarioData = (name: string, data: any[], label: string | null, ptr: number | null) => {
+    transOpenRef.current = false;
+    clearTimeout(transitionTimerRef.current);
+    setStageTransition(null);
     dataRef.current = data;
     scenarioRef.current = name;
     setCurrentScenario(name);
@@ -580,6 +620,33 @@ export function useKagRunner(audio: {
       if (t && envinitRef.current?.times[t] && world.bg) world.bg = { ...world.bg, time: t };
       return 'continue';
     }
+    // ---- transitions: buffer visual changes, commit atomically at end ----
+    if (name === 'begintrans') { transOpenRef.current = true; return 'continue'; }
+    if (name === 'endtrans') {
+      transOpenRef.current = false;
+      const method = String(args.trans ?? '');
+      const rawWait = args.transwait != null && args.transwait !== '' ? args.transwait : args.time;
+      const waitMs = rawWait != null && rawWait !== '' ? (parseInt(String(rawWait), 10) || 0) : 0;
+      const skipping = fastRef.current || rangeSkipRef.current;
+      // No method (or explicit notrans): atomic cut.
+      if (!method || method === 'notrans') {
+        commitStage();
+        if (waitMs && !skipping) await sleep(waitMs);
+        return 'continue';
+      }
+      const anim = transAnim(method);
+      const ms = waitMs || anim.ms;
+      const old = lastCommittedRef.current;
+      commitStage(); // reveal the new scene underneath
+      if (!skipping) {
+        setStageTransition({ old, cls: anim.cls, ms, key: ++transKeyRef.current });
+        clearTimeout(transitionTimerRef.current);
+        transitionTimerRef.current = setTimeout(() => setStageTransition(null), ms + 80);
+      }
+      if (waitMs && !skipping) await sleep(waitMs);
+      return 'continue';
+    }
+
     if (name === 'bg') {
       const stem = args.file || args.storage || args.str;
       if (stem) {
@@ -789,6 +856,10 @@ export function useKagRunner(audio: {
     if (name === 'sysjump' && String(args.to || '') === 'title') {
       playBgmTrack(null);
       stageRef.current = structuredClone(EMPTY_STAGE);
+      lastCommittedRef.current = structuredClone(EMPTY_STAGE);
+      transOpenRef.current = false;
+      clearTimeout(transitionTimerRef.current);
+      setStageTransition(null);
       commitStage();
       setIsFastForward(false); fastRef.current = false;
       rangeSkipRef.current = false;
@@ -856,6 +927,11 @@ export function useKagRunner(audio: {
   const jumpToLabel = (target: string): boolean => {
     const data = dataRef.current;
     if (!data) return false;
+    // A jump out of an unterminated trans block commits its pending visuals.
+    if (transOpenRef.current) {
+      transOpenRef.current = false;
+      commitStage();
+    }
     const idx = findLabelIndex(data, target);
     if (idx < 0) {
       console.warn('label not found:', target, 'in', scenarioRef.current);
@@ -1249,7 +1325,7 @@ export function useKagRunner(audio: {
     metaReady,
     gameState, setGameState,
     currentScenario, pointer,
-    stage, speaker, dialogueText, typewriterText,
+    stage, stageTransition, speaker, dialogueText, typewriterText,
     isWaiting, textVisible, advance,
     choiceOptions, chooseOption,
     chapterCard, video, onVideoEnded: endVideo,

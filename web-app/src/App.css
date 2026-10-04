@@ -369,3 +369,35 @@ button.danger { border-color: #b4555f; background: #4d2830; }
 .music-row.playing { background: rgba(157, 123, 216, 0.18); }
 .music-name { flex: 1; font-size: 14px; }
 .music-row button { font-size: 12px; padding: 2px 12px; }
+
+/* ---- begintrans/endtrans scene transitions ---- */
+.trans-overlay {
+  animation-timing-function: ease;
+  animation-fill-mode: forwards;
+  will-change: opacity, transform;
+}
+.trans-overlay.tr-fade { animation-name: tr-fade-anim; }
+.trans-overlay.tr-slide-r { animation-name: tr-slide-r; }
+.trans-overlay.tr-slide-l { animation-name: tr-slide-l; }
+.trans-overlay.tr-slide-u { animation-name: tr-slide-u; }
+.trans-overlay.tr-slide-d { animation-name: tr-slide-d; }
+@keyframes tr-fade-anim {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes tr-slide-r {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+@keyframes tr-slide-l {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+@keyframes tr-slide-u {
+  from { transform: translateY(0); }
+  to { transform: translateY(-100%); }
+}
+@keyframes tr-slide-d {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
