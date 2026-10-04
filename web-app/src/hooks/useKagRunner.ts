@@ -947,17 +947,19 @@ export function useKagRunner(audio: {
         }
         if (inst.type === 'text') {
           const raw = String(inst.text_jp || inst.text || '');
-          // nameplate from leading 【name】
+          // nameplate from leading 【name】; 【key/表示名】 shows only the
+          // display override after the slash (used for ？？？ before reveals).
+          const plateName = (s: string) => { const i = s.indexOf('/'); return i >= 0 ? s.slice(i + 1) : s; };
           const m = raw.match(/^【([^】]+)】(.*)$/s);
           let body = raw;
           if (m) {
-            speakerRef.current = m[1];
-            setSpeaker(m[1]);
+            speakerRef.current = plateName(m[1]);
+            setSpeaker(speakerRef.current);
             body = m[2];
           }
           if (freshLineRef.current) {
             // Spoken lines always carry a 【name】 prefix; narration clears it.
-            speakerRef.current = m ? m[1] : '';
+            speakerRef.current = m ? plateName(m[1]) : '';
             setSpeaker(speakerRef.current);
             // The framework hides the window with msgoff before transitions
             // and implicitly reopens it when the next line starts.
