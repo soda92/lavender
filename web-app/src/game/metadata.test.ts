@@ -58,6 +58,7 @@ describe('renderCharacter — level sheets', () => {
       pose: 'ポーズＣ', dress: '制服', diff: '基本', face: 'テレ１', level: 1,
     })!;
     expect(r.canvas).toEqual([277, 968]);
+    expect(r.refCanvasH).toBe(968);
     expect(r.scale).toBe(1);
     expect(r.offsetX).toBe(16);
     expect(r.offsetY).toBe(-33);
@@ -65,12 +66,14 @@ describe('renderCharacter — level sheets', () => {
     expect(r.face).not.toBeNull();
   });
 
-  it('level 2 (手前) is same logical size with ~2x sheet and the half-height offset', () => {
+  it('level 2 (手前) is the 2x zoom stage: 2x sheet, same ref scale, close-up offset', () => {
     const r = renderCharacter('アキナ', {
       pose: 'ポーズＣ', dress: '制服', diff: '基本', face: 'テレ１', level: 2,
     })!;
     expect(r.canvas).toEqual([554, 1937]);
-    // Regression: level 2 is a 2x-resolution variant, NOT a 2x display size.
+    // Every level draws at the level-1 pixel scale, so the 2x sheet reads
+    // as a 2x foreground zoom rather than a shrunken full-body sheet.
+    expect(r.refCanvasH).toBe(968);
     expect(r.scale).toBe(1);
     expect(r.offsetX).toBe(22);
     expect(r.offsetY).toBe(-951);

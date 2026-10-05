@@ -262,6 +262,13 @@ export interface RenderedSpritePart {
 
 export interface RenderedSprite {
   canvas: [number, number];
+  /**
+   * Level-1 canvas height, the engine's reference resolution. EVERY level
+   * sheet is drawn at the same per-pixel scale STAGE_H/refCanvasH: level
+   * sheets are zoom stages (0 small, 1 normal, 2 large), and the per-level
+   * charlevel offsets crop the oversized sheet into its framing.
+   */
+  refCanvasH: number;
   scale: number;
   body: RenderedSpritePart | null;
   face: RenderedSpritePart | null;
@@ -344,17 +351,19 @@ export function renderCharacter(
     }
   }
 
-  // Per-level sheets are resolution variants of the same art (level-2 sheets
-  // are ~2x the pixels, not 2x the display size): every level is scaled so the
-  // canvas height maps to STAGE_H. The per-pose/per-level charlevel offsets
-  // (up/right positive) then choose the crop: level-2 y is ~-canvasH/2, which
-  // centers the sheet at stage height and presents the upper body as a 手前
-  // foreground composition. CharacterView positions by center anchor.
+  // Levels are zoom stages (extractor convention: 0 = smallest), not mere
+  // resolution variants: every level sheet is rendered at the level-1 pixel
+  // scale, so the 2x level-2 sheet appears at 2x zoom and the per-pose /
+  // per-level charlevel offsets (sheet pixels, up/right positive) choose the
+  // crop — level-2 y ≈ -canvasH/2 frames the upper body as a 手前 close-up.
+  // CharacterView anchors the (oversized) sheet by stage center.
   const scale = 1;
+  const refCanvasH = (meta.canvas['1'] || meta.canvas[levelKey] || canvas)[1];
   const offs = ci.level_offsets?.[poseRef.pose]?.[level];
 
   return {
     canvas,
+    refCanvasH,
     scale,
     body,
     face,

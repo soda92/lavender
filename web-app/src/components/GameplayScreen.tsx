@@ -43,10 +43,10 @@ const CharacterView: React.FC<{ ch: CharState }> = ({ ch }) => {
   );
   if (!rendered) return null;
 
-  // The canvas always maps to STAGE_H; level sheets differ only in pixel
-  // resolution. charlevel offsets are up/right-positive, so the canvas is
-  // center-anchored at stage center and shifted by (-offsetY, +offsetX).
-  const d = STAGE_H / rendered.canvas[1];
+  // All level sheets share the level-1 pixel scale (zoom stages); the level-2
+  // sheet overflows the stage and is framed via its charlevel offset. Offsets
+  // are up/right-positive, center anchor shifted by (-offsetY, +offsetX).
+  const d = STAGE_H / rendered.refCanvasH;
   const w = rendered.canvas[0] * d;
   const h = rendered.canvas[1] * d;
   const left = STAGE_W / 2 + ch.xpos - w / 2 + rendered.offsetX * d;
