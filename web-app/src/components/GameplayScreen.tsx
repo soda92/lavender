@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { envYOffset, mediaUrl, renderCharacter, timeDef } from '../game/metadata';
 import { paintSpriteComposite } from '../game/spriteComposite';
+import { useT } from '../game/i18n';
 import type { StageState, CharState, DynLayer } from '../hooks/useKagRunner';
 
 const STAGE_W = 800;
@@ -194,6 +195,7 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
     isFastForward, toggleFastForward, quickLoad, saveToSlot,
     windowHidden, sf,
   } = runner;
+  const t = useT();
   const immerse = !!sf?.immerseMode;
 
   const shownText = typewriterText || (isWaiting ? dialogueText : dialogueText);
@@ -292,14 +294,14 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
 
       {/* controls */}
       <div className="stage-controls" onClick={e => e.stopPropagation()}>
-        <button title="Auto" className={isAutoMode ? 'active' : ''} onClick={toggleAuto}>自動</button>
-        <button title="Skip" className={isFastForward ? 'active' : ''} onClick={toggleFastForward}>スキップ</button>
-        <button title="Backlog" onClick={e => { e.currentTarget.blur(); runner.setSideTab(runner.sideTab === 'history' ? null : 'history'); }}>履歴</button>
-        <button title="Page flipper" onClick={e => { e.currentTarget.blur(); runner.setSideTab(runner.sideTab === 'flipper' ? null : 'flipper'); }}>ページ</button>
-        <button title="Document archives" onClick={e => { e.currentTarget.blur(); runner.setSideTab(runner.sideTab === 'archives' ? null : 'archives'); }}>文書</button>
-        <button title="Quick Load" onClick={quickLoad}>Q.Load</button>
-        <button title="Quick Save" onClick={() => saveToSlot('q')}>Q.Save</button>
-        <button title="Settings" onClick={e => { e.currentTarget.blur(); runner.setSideTab(runner.sideTab === 'settings' ? null : 'settings'); }}>設定</button>
+        <button title={t('control.auto')} className={isAutoMode ? 'active' : ''} onClick={toggleAuto}>{t('control.auto')}</button>
+        <button title={t('control.skip')} className={isFastForward ? 'active' : ''} onClick={toggleFastForward}>{t('control.skip')}</button>
+        <button title={t('tab.history')} onClick={e => { e.currentTarget.blur(); runner.setSideTab(runner.sideTab === 'history' ? null : 'history'); }}>{t('tab.history')}</button>
+        <button title={t('tab.flipper')} onClick={e => { e.currentTarget.blur(); runner.setSideTab(runner.sideTab === 'flipper' ? null : 'flipper'); }}>{t('tab.flipper')}</button>
+        <button title={t('tab.archives')} onClick={e => { e.currentTarget.blur(); runner.setSideTab(runner.sideTab === 'archives' ? null : 'archives'); }}>{t('tab.archives')}</button>
+        <button title={t('control.quickLoad')} onClick={quickLoad}>{t('control.quickLoad')}</button>
+        <button title={t('control.quickSave')} onClick={() => saveToSlot('q')}>{t('control.quickSave')}</button>
+        <button title={t('tab.settings')} onClick={e => { e.currentTarget.blur(); runner.setSideTab(runner.sideTab === 'settings' ? null : 'settings'); }}>{t('tab.settings')}</button>
       </div>
     </div>
     </div>

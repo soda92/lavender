@@ -3,14 +3,15 @@ import HistoryTab from './HistoryModal';
 import FlipperTab from './PageFlipper';
 import ArchivesTab from './ArchivesModal';
 import SettingsTab from './SettingsPanel';
+import { useT, type TKey } from '../game/i18n';
 
 export type SideTab = 'history' | 'flipper' | 'archives' | 'settings';
 
-const TABS: Array<{ id: SideTab; label: string; playingOnly?: boolean }> = [
-  { id: 'history', label: '履歴', playingOnly: true },
-  { id: 'flipper', label: 'ページ', playingOnly: true },
-  { id: 'archives', label: '文書' },
-  { id: 'settings', label: '設定' },
+const TABS: Array<{ id: SideTab; labelKey: TKey; playingOnly?: boolean }> = [
+  { id: 'history', labelKey: 'tab.history', playingOnly: true },
+  { id: 'flipper', labelKey: 'tab.flipper', playingOnly: true },
+  { id: 'archives', labelKey: 'tab.archives' },
+  { id: 'settings', labelKey: 'tab.settings' },
 ];
 
 interface Props {
@@ -28,21 +29,22 @@ interface Props {
  * it lives in the viewport letterbox, never over the game.
  */
 const SidePanel: React.FC<Props> = ({ tab, playing, dockStyle, runner, onTab, onClose}) => {
-  const tabs = TABS.filter(t => !t.playingOnly || playing);
+  const t = useT();
+  const tabs = TABS.filter(tb => !tb.playingOnly || playing);
 
   return (
     <div className="side-panel" style={dockStyle}>
       <div className="side-tabbar">
-        {tabs.map(t => (
+        {tabs.map(tb => (
           <button
-            key={t.id}
-            className={tab === t.id ? 'on' : ''}
-            onClick={e => { e.currentTarget.blur(); onTab(t.id); }}
+            key={tb.id}
+            className={tab === tb.id ? 'on' : ''}
+            onClick={e => { e.currentTarget.blur(); onTab(tb.id); }}
           >
-            {t.label}
+            {t(tb.labelKey)}
           </button>
         ))}
-        <button className="side-close" title="閉じる" onClick={e => { e.currentTarget.blur(); onClose(); }}>×</button>
+        <button className="side-close" title={t('common.close')} onClick={e => { e.currentTarget.blur(); onClose(); }}>×</button>
       </div>
 
       {tab === 'history' && (

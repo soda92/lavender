@@ -339,6 +339,31 @@ button.danger { border-color: #b4555f; background: #4d2830; }
   max-width: 150px;
 }
 .settings-hint { margin-top: 14px; font-size: 11px; opacity: 0.55; line-height: 1.8; }
+.settings-exit { margin-top: 16px; }
+.settings-exit-btn {
+  width: 100%;
+  background: #221a38;
+  color: var(--ink);
+  border: 1px solid #b4555f;
+  border-radius: 3px;
+  padding: 7px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.settings-exit-btn:hover { background: #4d2830; }
+.settings-exit-warn { font-size: 11px; opacity: 0.8; margin: 0 0 8px; line-height: 1.6; }
+.settings-exit-btns { display: flex; gap: 6px; }
+.settings-exit-btns .seg-btn {
+  flex: 1;
+  background: #221a38;
+  color: var(--ink);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.settings-exit-btns .seg-btn.danger { border-color: #b4555f; background: #4d2830; }
 
 /* saves */
 .saves-panel { width: 740px; }

@@ -7,8 +7,10 @@ import TitleScreen from './components/TitleScreen';
 import SidePanel, { type SideTab } from './components/SidePanel';
 import GalleryScreen from './components/GalleryScreen';
 import MusicRoom from './components/MusicRoom';
+import { useT } from './game/i18n';
 
 export default function App() {
+  const t = useT();
   const [bootVol, setBootVol] = useState(8);
   const [bootSe, setBootSe] = useState(8);
   useEffect(() => {
@@ -139,7 +141,7 @@ export default function App() {
   }, [runner]);
 
   if (!runner.metaReady) {
-    return <div className="boot-screen">光輪の町、ラベンダーの少女<br /><span>Now Loading…</span></div>;
+    return <div className="boot-screen">光輪の町、ラベンダーの少女<br /><span>{t('boot.loading')}</span></div>;
   }
 
   return (

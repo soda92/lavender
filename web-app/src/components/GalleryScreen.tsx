@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useT } from '../game/i18n';
 
 interface Props {
   sf: Record<string, any>;
@@ -6,6 +7,7 @@ interface Props {
 }
 
 const GalleryScreen: React.FC<Props> = ({ sf, onBack }) => {
+  const t = useT();
   const [images, setImages] = useState<string[]>([]);
   const [zoom, setZoom] = useState<string | null>(null);
 
@@ -21,9 +23,9 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack }) => {
   return (
     <div className="extras-screen">
       <div className="extras-head">
-        <h2>CG 鑑賞</h2>
+        <h2>{t('gallery.title')}</h2>
         <span className="extras-count">{unlockedCount} / {images.length}</span>
-        <button onClick={onBack}>タイトルへ</button>
+        <button onClick={onBack}>{t('gallery.toTitle')}</button>
       </div>
       <div className="gallery-grid">
         {images.map(url => {

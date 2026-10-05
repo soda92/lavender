@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useT } from '../game/i18n';
 
 interface Props {
   onBack: () => void;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 const MusicRoom: React.FC<Props> = ({ onBack, audio }) => {
+  const t = useT();
   const [tracks, setTracks] = useState<string[]>([]);
   const [current, setCurrent] = useState<string | null>(null);
 
@@ -36,9 +38,9 @@ const MusicRoom: React.FC<Props> = ({ onBack, audio }) => {
   return (
     <div className="extras-screen">
       <div className="extras-head">
-        <h2>音楽鑑賞</h2>
-        <span className="extras-count">{tracks.length} 曲</span>
-        <button onClick={() => { audio.stopBgm(); onBack(); }}>タイトルへ</button>
+        <h2>{t('music.title')}</h2>
+        <span className="extras-count">{t('music.trackCount', { n: tracks.length })}</span>
+        <button onClick={() => { audio.stopBgm(); onBack(); }}>{t('gallery.toTitle')}</button>
       </div>
       <div className="music-list">
         {tracks.map(url => {
@@ -48,8 +50,8 @@ const MusicRoom: React.FC<Props> = ({ onBack, audio }) => {
           return (
             <div key={url} className={`music-row ${playing ? 'playing' : ''}`}>
               <span className="music-name">{stem}</span>
-              <button onClick={() => audio.playBgm(url)}>再生</button>
-              <button onClick={audio.stopBgm}>停止</button>
+              <button onClick={() => audio.playBgm(url)}>{t('music.play')}</button>
+              <button onClick={audio.stopBgm}>{t('music.stop')}</button>
             </div>
           );
         })}

@@ -1,4 +1,5 @@
 import React, {useEffect, useMemo, useState} from 'react';
+import { useT } from '../game/i18n';
 
 interface Props {
   instructions: any[];
@@ -16,6 +17,7 @@ const stripName = (raw: string): {speaker: string; text: string} => {
 };
 
 const FlipperTab: React.FC<Props> = ({instructions, pointer, scenario, onSeek}) => {
+  const t = useT();
   const max = Math.max(0, instructions.length - 1);
   const [target, setTarget] = useState(Math.min(pointer, max));
 
@@ -61,7 +63,7 @@ const FlipperTab: React.FC<Props> = ({instructions, pointer, scenario, onSeek}) 
             onChange={e => setTarget(Math.max(0, Math.min(max, parseInt(e.target.value || '0', 10) || 0)))}
           />
           <span>/ {max}</span>
-          <button className="flipper-jump" onClick={jump}>ここへ移動</button>
+          <button className="flipper-jump" onClick={jump}>{t('flipper.jump')}</button>
         </div>
 
         <input
@@ -90,11 +92,11 @@ const FlipperTab: React.FC<Props> = ({instructions, pointer, scenario, onSeek}) 
               <span>{r.text}</span>
             </div>
           ))}
-          {preview.length === 0 && <div className="archives-empty">この付近に台詞はありません</div>}
+          {preview.length === 0 && <div className="archives-empty">{t('flipper.empty')}</div>}
         </div>
 
       <div className="flipper-hint">
-        移動すると、シナリオ先頭からその位置までを自動再生して場面を復元します（音声・動画は省略）。
+        {t('flipper.hint')}
       </div>
     </div>
   );

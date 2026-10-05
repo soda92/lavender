@@ -515,6 +515,39 @@ export function useKagRunner(audio: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadScenario]);
 
+  // Shared with the script's [sysjump to="title"]: tear down the running
+  // session and return to the title screen (which restarts the title BGM).
+  const returnToTitle = useCallback(() => {
+    runTokenRef.current++;
+    runningRef.current = false;
+    seekRef.current = null;
+    if (typingRef.current) { clearInterval(typingRef.current.timer); typingRef.current = null; }
+    playBgmTrack(null);
+    stageRef.current = structuredClone(EMPTY_STAGE);
+    lastCommittedRef.current = structuredClone(EMPTY_STAGE);
+    transOpenRef.current = false;
+    clearTimeout(transitionTimerRef.current);
+    setStageTransition(null);
+    commitStage();
+    setIsFastForward(false); fastRef.current = false;
+    rangeSkipRef.current = false;
+    setIsAutoMode(false); autoRef.current = false;
+    choiceOpenRef.current = false;
+    pendingChoicesRef.current = [];
+    setChoiceOptions(null);
+    setChapterCard(null);
+    setTextVisible(true); textVisibleRef.current = true;
+    setSpeaker(''); speakerRef.current = '';
+    setDialogueText(''); setTypewriterText('');
+    setWindowHidden(false);
+    videoRef.current = null;
+    setVideo(null);
+    setSideTab(null);
+    window.history.replaceState(null, '', '#');
+    setGameState('TITLE');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // -------------------------------------------------------------------------
   // Command handling
   // -------------------------------------------------------------------------
@@ -925,21 +958,7 @@ export function useKagRunner(audio: {
 
     // ---- system navigation ----
     if (name === 'sysjump' && String(args.to || '') === 'title') {
-      playBgmTrack(null);
-      stageRef.current = structuredClone(EMPTY_STAGE);
-      lastCommittedRef.current = structuredClone(EMPTY_STAGE);
-      transOpenRef.current = false;
-      clearTimeout(transitionTimerRef.current);
-      setStageTransition(null);
-      commitStage();
-      setIsFastForward(false); fastRef.current = false;
-      rangeSkipRef.current = false;
-      setIsAutoMode(false); autoRef.current = false;
-      choiceOpenRef.current = false;
-      setChoiceOptions(null);
-      setChapterCard(null);
-      setTextVisible(true); textVisibleRef.current = true;
-      setGameState('TITLE');
+      returnToTitle();
       return 'stop';
     }
     if (name === 'cancelautomode') {
@@ -1499,7 +1518,7 @@ export function useKagRunner(audio: {
     isFastForward, toggleFastForward,
     language, setLanguage,
     f, setF, sf: sfState, setSf, tf,
-    startNewGame, loadScenario, loadSaveSlot, saveToSlot, quickLoad, deleteSlot,
+    startNewGame, returnToTitle, loadScenario, loadSaveSlot, saveToSlot, quickLoad, deleteSlot,
     updateSlotMeta, saveSlots,
     sessionConflict,
   };

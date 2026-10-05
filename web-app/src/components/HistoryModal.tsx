@@ -1,5 +1,6 @@
 import React from 'react';
 import type { HistoryItem } from '../hooks/useKagRunner';
+import { useT } from '../game/i18n';
 
 interface Props {
   items: HistoryItem[];
@@ -8,6 +9,7 @@ interface Props {
 
 /** Backlog tab body (rendered inside <SidePanel>). */
 const HistoryTab: React.FC<Props> = ({ items, onReplayVoice }) => {
+  const t = useT();
   return (
     <div className="side-body">
       <div className="history-list">
@@ -20,7 +22,7 @@ const HistoryTab: React.FC<Props> = ({ items, onReplayVoice }) => {
             )}
           </div>
         ))}
-        {items.length === 0 && <div className="empty-hint">履歴はありません</div>}
+        {items.length === 0 && <div className="empty-hint">{t('history.empty')}</div>}
       </div>
     </div>
   );

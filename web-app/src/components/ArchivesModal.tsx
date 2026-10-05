@@ -1,5 +1,6 @@
 import React, {useMemo, useState} from 'react';
 import {getMeta, mediaUrl} from '../game/metadata';
+import { useT } from '../game/i18n';
 
 export interface ArchiveSlot {
   currentScenario?: string;
@@ -29,8 +30,8 @@ interface Props {
 type Tab = 'recent' | 'chapter' | 'pinned';
 
 /** scenario file ("scenario/lave37") -> chapter caption from the scenario index. */
-export function chapterOf(scenario?: string): string {
-  if (!scenario) return 'その他';
+export function chapterOf(scenario?: string, other = 'その他'): string {
+  if (!scenario) return other;
   const file = scenario.split('/').pop() || scenario;
   const list = getMeta()?.scenarios || [];
   const hit = list.find((s: any) => s.storage.endsWith('/' + file) || s.name === file);
@@ -46,6 +47,7 @@ const ArchivesTab: React.FC<Props> = ({
   slots, playing, currentScenario, currentPointer, currentSpeaker, currentDialogue,
   onSave, onLoad, onDelete, onUpdateMeta,
 }) => {
+  const t = useT();
   const [tab, setTab] = useState<Tab>('recent');
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<string | null>(null);
@@ -61,7 +63,7 @@ const ArchivesTab: React.FC<Props> = ({
       ? list.filter(({id, slot}) => {
           const hay = [
             slot.note, slot.dialogueText, slot.speaker, shortFile(slot.currentScenario),
-            slot.date, chapterOf(slot.currentScenario), id,
+            slot.date, chapterOf(slot.currentScenario, t('archives.other')), id,
           ].filter(Boolean).join(' ').toLowerCase();
           return hay.includes(q);
         })
@@ -74,18 +76,19 @@ const ArchivesTab: React.FC<Props> = ({
     });
     if (tab === 'pinned') return pinnedFirst.filter(e => e.slot.pinned);
     return pinnedFirst;
-  }, [slots, query, tab]);
+  }, [slots, query, tab, t]);
 
   const groups = useMemo(() => {
     const map = new Map<string, typeof entries>();
+    const other = t('archives.other');
     for (const e of entries) {
-      const ch = chapterOf(e.slot.currentScenario);
+      const ch = chapterOf(e.slot.currentScenario, other);
       const arr = map.get(ch) || [];
       arr.push(e);
       map.set(ch, arr);
     }
     return Array.from(map.entries());
-  }, [entries]);
+  }, [entries, t]);
 
   const nextId = useMemo(() => {
     let i = 0;
@@ -107,17 +110,17 @@ const ArchivesTab: React.FC<Props> = ({
             ? <img src={thumb(s)!} alt="" onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden'; }} />
             : <span className="archive-thumb-blank">—</span>}
           <span className="archive-thumb-tag">
-            {isAuto ? 'オート' : `#${id}`} · {shortFile(s.currentScenario)}:{s.pointer}
+            {isAuto ? t('archives.auto') : `#${id}`} · {shortFile(s.currentScenario)}:{s.pointer}
           </span>
         </div>
         <div className="archive-body">
           <div className="archive-meta">
-            <span className="archive-chapter">{chapterOf(s.currentScenario)}</span>
+            <span className="archive-chapter">{chapterOf(s.currentScenario, t('archives.other'))}</span>
             <span className="archive-date">{s.date}</span>
             {!isAuto && (
               <button
                 className={`archive-pin ${s.pinned ? 'on' : ''}`}
-                title="マーク"
+                title={t('archives.mark')}
                 onClick={() => onUpdateMeta(id, {pinned: !s.pinned})}
               >
                 {s.pinned ? '★' : '☆'}
@@ -130,22 +133,22 @@ const ArchivesTab: React.FC<Props> = ({
                 autoFocus
                 value={draft}
                 onChange={e => setDraft(e.target.value)}
-                placeholder="メモを入力…"
+                placeholder={t('archives.notePlaceholder')}
                 onKeyDown={e => {
                   if (e.key === 'Enter') { onUpdateMeta(id, {note: draft.trim()}); setEditing(null); }
                   if (e.key === 'Escape') setEditing(null);
                 }}
               />
-              <button onClick={() => { onUpdateMeta(id, {note: draft.trim()}); setEditing(null); }}>保存</button>
-              <button onClick={() => setEditing(null)}>取消</button>
+              <button onClick={() => { onUpdateMeta(id, {note: draft.trim()}); setEditing(null); }}>{t('common.save')}</button>
+              <button onClick={() => setEditing(null)}>{t('common.cancel')}</button>
             </div>
           ) : (!isAuto || s.note) ? (
             <div
               className={`archive-note ${s.note ? 'has' : ''}`}
               onClick={() => { if (!isAuto) { setEditing(id); setDraft(s.note || ''); } }}
-              title={isAuto ? undefined : 'クリックでメモを編集'}
+              title={isAuto ? undefined : t('archives.editNoteTitle')}
             >
-              {s.note ? `📝 ${s.note}` : 'メモを追加…'}
+              {s.note ? `📝 ${s.note}` : t('archives.addNote')}
             </div>
           ) : null}
           <div className="archive-line">
@@ -155,13 +158,13 @@ const ArchivesTab: React.FC<Props> = ({
           <div className="archive-actions">
             {playing && !isAuto && (
               <button className="archive-btn" onClick={() => onSave(isAuto ? 0 : Number(id), {note: s.note, pinned: s.pinned})}>
-                上書き
+                {t('archives.overwrite')}
               </button>
             )}
             {!isAuto && (
-              <button className="archive-btn danger" onClick={() => setConfirmDel(id)}>消去</button>
+              <button className="archive-btn danger" onClick={() => setConfirmDel(id)}>{t('common.delete')}</button>
             )}
-            <button className="archive-btn primary" onClick={() => onLoad(s)}>読込</button>
+            <button className="archive-btn primary" onClick={() => onLoad(s)}>{t('archives.load')}</button>
           </div>
         </div>
       </div>
@@ -174,25 +177,25 @@ const ArchivesTab: React.FC<Props> = ({
         className="archives-search"
         value={query}
         onChange={e => setQuery(e.target.value)}
-        placeholder="メモ・台詞・場面を検索…"
+        placeholder={t('archives.search')}
       />
 
         <div className="archives-tabs">
-          <button className={tab === 'recent' ? 'on' : ''} onClick={() => setTab('recent')}>新着順</button>
-          <button className={tab === 'chapter' ? 'on' : ''} onClick={() => setTab('chapter')}>章別</button>
-          <button className={tab === 'pinned' ? 'on' : ''} onClick={() => setTab('pinned')}>★ マーク</button>
+          <button className={tab === 'recent' ? 'on' : ''} onClick={() => setTab('recent')}>{t('archives.recent')}</button>
+          <button className={tab === 'chapter' ? 'on' : ''} onClick={() => setTab('chapter')}>{t('archives.chapter')}</button>
+          <button className={tab === 'pinned' ? 'on' : ''} onClick={() => setTab('pinned')}>{t('archives.pinned')}</button>
           {playing && (
             <button
               className="archives-new"
               onClick={() => onSave(nextId, {note: `[${shortFile(currentScenario)}:${currentPointer}] ${(currentSpeaker ? currentSpeaker + ' ' : '')}${(currentDialogue || '').slice(0, 20)}`})}
             >
-              ＋ 現在を保存 (#{nextId + 1})
+              {t('archives.saveCurrent', { n: nextId + 1 })}
             </button>
           )}
         </div>
 
         <div className="archives-list">
-          {entries.length === 0 && <div className="archives-empty">保存された文書はありません</div>}
+          {entries.length === 0 && <div className="archives-empty">{t('archives.empty')}</div>}
           {tab === 'chapter'
             ? groups.map(([ch, list]) => (
                 <div key={ch} className="archive-group">
@@ -206,10 +209,10 @@ const ArchivesTab: React.FC<Props> = ({
       {confirmDel && (
         <div className="side-sub" onClick={() => setConfirmDel(null)}>
           <div className="confirm-box" onClick={e => e.stopPropagation()}>
-            <p>この文書を消去しますか？</p>
+            <p>{t('archives.confirmDelete')}</p>
             <div>
-              <button onClick={() => setConfirmDel(null)}>取消</button>
-              <button className="danger" onClick={() => { onDelete(confirmDel); setConfirmDel(null); }}>消去</button>
+              <button onClick={() => setConfirmDel(null)}>{t('common.cancel')}</button>
+              <button className="danger" onClick={() => { onDelete(confirmDel); setConfirmDel(null); }}>{t('common.delete')}</button>
             </div>
           </div>
         </div>
