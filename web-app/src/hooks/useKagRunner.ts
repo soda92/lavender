@@ -265,6 +265,9 @@ export function useKagRunner(audio: {
   // Scene recollection (engine "scenemode"): play the memory_begin..memory_end
   // span of a scenario and return to the gallery scene tab at the end label.
   const sceneReplayRef = useRef<{ storage: string; endLabel: string } | null>(null);
+  // Slot addressed by a bare [ev] tag: follows the most recent ev_* tag, so
+  // [ev_*_l] ... [ev opacity=255] drives the large layer, not the base slot.
+  const lastEventSlotRef = useRef<'__event__' | '__event_l__'>('__event__');
   const [sceneReplay, setSceneReplay] =
     useState<{ storage: string; endLabel: string } | null>(null);
   const [galleryViewMode, setGalleryViewMode] = useState<'cg' | 'scenes'>('cg');
@@ -461,6 +464,7 @@ export function useKagRunner(audio: {
     pendingChoicesRef.current = [];
     choiceOpenRef.current = false;
     setChoiceOptions(null);
+    lastEventSlotRef.current = '__event__';
     if (opts.seek != null) {
       // Rebuild the scene by silently replaying from the file start; the seek
       // pointer is the stop boundary handled inside runSlice.
@@ -859,9 +863,11 @@ export function useKagRunner(audio: {
 
     // ---- events / dynamic layers ----
     if (name === 'ev') {
-      const ly = upsertLayer('__event__', { front: true, level: 6 });
+      const slot = lastEventSlotRef.current;
+      const ly = upsertLayer(slot, { front: true, level: 6 });
       applyLayerArgs(ly, args, argv);
       if (argv.includes('hide') || args.visible === 'false') ly.visible = false;
+      else if (argv.includes('show')) ly.visible = true;
       if (ly.file && /^ev/.test(ly.file)) markCgSeen(ly.file);
       commitStage();
       return 'continue';
@@ -883,13 +889,18 @@ export function useKagRunner(audio: {
       return 'continue';
     }
     if (/^ev[_]/i.test(name) && mediaUrl(name)) {
-      // The framework event layer is a single slot: ev_<stem> tags set the
-      // current CG image (later tags swap it in place; bare [ev] retargets
-      // motion/position), while *_l partials stack on a separate slot.
-      const slot = /_l$/i.test(name) ? '__event_l__' : '__event__';
+      // The framework event plugin keeps two addressed layers: ev_<stem>
+      // tags set the current CG on the base slot, while *_l tags drive the
+      // persistent "large" pan layer (transient named overlays such as
+      // akina1/scrl are created separately via [newlay]). Every tag re-shows
+      // its slot (tags after hideall/transitions restore visibility); an
+      // explicit opacity=0 is a transparent preload, not a hide.
+      const slot: '__event__' | '__event_l__' = /_l$/i.test(name) ? '__event_l__' : '__event__';
+      lastEventSlotRef.current = slot;
       const ly = upsertLayer(slot, { file: name, front: true, level: 6, xpos: null, ypos: null });
       applyLayerArgs(ly, args, argv);
       ly.file = name; // re-addressing (e.g. 06a -> 06b) swaps the image
+      if (!argv.includes('hide') && args.visible !== 'false') ly.visible = true;
       markCgSeen(name);
       commitStage();
       return 'continue';
@@ -942,6 +953,7 @@ export function useKagRunner(audio: {
     if (name === 'clearlayers') {
       world.layers = {};
       world.chars = {};
+      lastEventSlotRef.current = '__event__';
       commitStage();
       return 'continue';
     }

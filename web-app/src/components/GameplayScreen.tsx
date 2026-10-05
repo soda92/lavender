@@ -123,7 +123,7 @@ const LayerView: React.FC<{ layer: DynLayer }> = ({ layer }) => {
   if (!layer.file) return null;
   const url = mediaUrl(layer.file);
   if (!url) return null;
-  const centered = layer.xpos == null && layer.ypos == null;
+  const positioned = layer.xpos != null || layer.ypos != null;
   return (
     <img
       src={url}
@@ -135,14 +135,16 @@ const LayerView: React.FC<{ layer: DynLayer }> = ({ layer }) => {
         opacity: layer.opacity / 255,
         display: layer.visible ? 'block' : 'none',
         zIndex: layer.front ? 30 + layer.level : 10 + layer.level,
-        ...(centered
+        ...(!positioned
           ? { left: 0, top: 0, width: STAGE_W, height: STAGE_H, objectFit: 'contain' }
           : {
-              left: `calc(50% + ${layer.xpos ?? 0}px)`,
-              top: `calc(50% + ${layer.ypos ?? 0}px)`,
+              // Engine alignment is center/center: xpos/ypos name the image
+              // center in stage coordinates (top-left origin, so 400/300 is
+              // mid-stage). Large ("_l") art is 1600x1200 and drawn at its
+              // natural size; the 800x600 stage simply crops it for pans.
+              left: layer.xpos ?? 0,
+              top: layer.ypos ?? 0,
               transform: 'translate(-50%, -50%)',
-              maxWidth: STAGE_W,
-              maxHeight: STAGE_H,
             }),
       }}
     />
