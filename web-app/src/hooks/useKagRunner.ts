@@ -69,6 +69,7 @@ export interface ChoiceOption {
   text: string;
   target: string;
   storage?: string;
+  exp?: string; // seladd exp="..." runs when this branch is chosen
 }
 
 export interface HistoryItem {
@@ -140,7 +141,7 @@ const KAG_CONSTS: Record<string, number> = {
   SKIP_NOWAIT: 3,
 };
 
-function sandboxEval(exp: string, f: any, sf: any, tf: any, skipMode: number): any {
+function sandboxEval(exp: string, f: any, sf: any, tf: any, skipMode: number, isRecollection = false): any {
   const cleaned = String(exp)
     .replace(/^&@?/, '')
     .replace(/&(?=[a-zA-Z_$])/g, '')
@@ -156,7 +157,7 @@ function sandboxEval(exp: string, f: any, sf: any, tf: any, skipMode: number): a
     );
     return fn(
       f, sf, tf,
-      { skipMode, isRecollection: false },
+      { skipMode, isRecollection },
       {},
       ...Object.values(KAG_CONSTS),
     );
@@ -164,6 +165,26 @@ function sandboxEval(exp: string, f: any, sf: any, tf: any, skipMode: number): a
     console.warn('eval failed:', exp, e);
     return undefined;
   }
+}
+
+/**
+ * Expand a KAG command attribute. Attributes prefixed with "&" are
+ * expressions: &expr evaluates in the f/sf/tf sandbox; &@"..." is a raw
+ * here-string containing ${expr} interpolations (used for variant artwork
+ * such as ev_riko_h_05a${f.rikoh_suffix}_l).
+ */
+function expandKagArg(raw: unknown, f: any, sf: any, tf: any, skip: number): unknown {
+  if (typeof raw !== 'string' || raw[0] !== '&') return raw;
+  const s = raw.slice(1);
+  if (s.startsWith('@')) {
+    const lit = s.slice(1).replace(/^"|"$/g, '');
+    return lit.replace(/\$\{([^}]*)\}/g, (_m, expr: string) => {
+      const v = sandboxEval(expr.trim(), f, sf, tf, skip);
+      return v == null ? '' : String(v);
+    });
+  }
+  const v = sandboxEval(raw, f, sf, tf, skip);
+  return v == null ? raw : v;
 }
 
 // ---------------------------------------------------------------------------
@@ -730,14 +751,23 @@ export function useKagRunner(audio: {
   /** Returns false when the slice should stop for a jump/load failure. */
   const handleCommand = async (inst: any): Promise<'continue' | 'stop' | 'jump'> => {
     const name: string = inst.name;
-    const args: Record<string, any> = inst.args || {};
-    const argv: string[] = inst.argv || [];
+    // Expand &-expression attributes once, before any handler runs.
+    const rawArgs: Record<string, any> = inst.args || {};
+    const args: Record<string, any> = {};
+    for (const [k, v] of Object.entries(rawArgs)) {
+      args[k] = expandKagArg(v, fRef.current, sfRef.current, tfRef.current, skipModeNum());
+    }
+    const rawArgv: string[] = inst.argv || [];
+    const argv: string[] = rawArgv.map(a => {
+      const v = expandKagArg(a, fRef.current, sfRef.current, tfRef.current, skipModeNum());
+      return v == null ? a : String(v);
+    });
     const lname = name.toLowerCase();
     const world = stageRef.current;
 
     // ---- flow control ----
     if (name === 'next') {
-      if (args.eval && !sandboxEval(args.eval, fRef.current, sfRef.current, tfRef.current, skipModeNum())) {
+      if (args.eval && !sandboxEval(args.eval, fRef.current, sfRef.current, tfRef.current, skipModeNum(), !!sceneReplayRef.current)) {
         return 'continue';
       }
       if (args.storage) {
@@ -772,6 +802,7 @@ export function useKagRunner(audio: {
           text: String(args.text || ''),
           target: String(args.target || ''),
           storage: args.storage,
+          exp: args.exp != null ? String(args.exp) : undefined,
         });
       }
       return 'continue';
@@ -863,7 +894,13 @@ export function useKagRunner(audio: {
 
     // ---- events / dynamic layers ----
     if (name === 'ev') {
-      const slot = lastEventSlotRef.current;
+      // Variant scenes address layers via [ev file="..._l"] instead of tag
+      // names; pick the slot from the referenced file and remember it so
+      // the following [ev opacity=..]/[ev xpos=..] commands retarget it.
+      let slot = lastEventSlotRef.current;
+      const fileStem = args.file ? String(args.file).replace(/\.\w+$/, '') : null;
+      if (fileStem) slot = /_l$/i.test(fileStem) ? '__event_l__' : '__event__';
+      lastEventSlotRef.current = slot;
       const ly = upsertLayer(slot, { front: true, level: 6 });
       applyLayerArgs(ly, args, argv);
       if (argv.includes('hide') || args.visible === 'false') ly.visible = false;
@@ -1102,7 +1139,7 @@ export function useKagRunner(audio: {
       );
       const r = fn(
         fRef.current, sfRef.current, tfRef.current,
-        { skipMode: skipModeNum(), isRecollection: false }, {},
+        { skipMode: skipModeNum(), isRecollection: !!sceneReplayRef.current }, {},
         ...Object.values(KAG_CONSTS),
       );
       fRef.current = r.f; sfRef.current = r.sf; tfRef.current = r.tf;
@@ -1305,6 +1342,12 @@ export function useKagRunner(audio: {
           setIsWaiting(true);
           break;
         }
+        if (inst.type === 'eval') {
+          sandboxExec(String(inst.exp || ''));
+          ptrRef.current++;
+          setPointer(ptrRef.current);
+          continue;
+        }
         if (inst.type !== 'command') { ptrRef.current++; continue; }
 
         const outcome = await handleCommand(inst);
@@ -1328,13 +1371,22 @@ export function useKagRunner(audio: {
             choiceOpenRef.current = false;
             setChoiceOptions(null);
             const opt = opts[0];
+            if (opt?.exp) sandboxExec(opt.exp);
+            let moved = false;
             if (opt?.storage && opt.target.includes('|')) {
               const [s, l] = opt.target.split('|');
               await loadScenario(s || opt.storage, l);
+              moved = true;
             } else if (opt?.storage) {
               await loadScenario(opt.storage, opt.target);
+              moved = true;
             } else if (opt?.target) {
-              jumpToLabel(opt.target);
+              moved = jumpToLabel(opt.target);
+            }
+            // An exp-only branch leaves pointer at [select]; step past it.
+            if (!moved) {
+              ptrRef.current++;
+              setPointer(ptrRef.current);
             }
             continue;
           }
@@ -1418,13 +1470,21 @@ export function useKagRunner(audio: {
     setIsWaiting(false);
     freshLineRef.current = true;
     (async () => {
+      // A branch may only carry an exp assignment (no jump target).
+      if (opt.exp) sandboxExec(opt.exp);
       if (opt.storage && opt.target.includes('|')) {
         const [s, l] = opt.target.split('|');
         await loadScenario(s || opt.storage, l);
       } else if (opt.storage) {
         await loadScenario(opt.storage, opt.target);
-      } else {
+      } else if (opt.target) {
         if (jumpToLabel(opt.target)) void runSlice();
+      } else {
+        // Exp-only choice: continue past the [select] command.
+        choiceOpenRef.current = false;
+        ptrRef.current++;
+        setPointer(ptrRef.current);
+        void runSlice();
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
