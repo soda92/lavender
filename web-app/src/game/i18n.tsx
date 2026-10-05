@@ -86,6 +86,17 @@ const dict = {
 
   'gallery.title': { ja: 'CG 鑑賞', en: 'CG Gallery' },
   'gallery.toTitle': { ja: 'タイトルへ', en: 'To Title' },
+  'gallery.catAll': { ja: 'すべて', en: 'All' },
+  'gallery.catAkina': { ja: 'アキナ', en: 'Akina' },
+  'gallery.catHaruka': { ja: 'はるか', en: 'Haruka' },
+  'gallery.catHikaru': { ja: 'ヒカル', en: 'Hikaru' },
+  'gallery.catReika': { ja: 'レイカ', en: 'Reika' },
+  'gallery.catRiko': { ja: 'リコ', en: 'Riko' },
+  'gallery.catOther': { ja: 'その他', en: 'Other' },
+  'gallery.variantsTitle': { ja: '{n} 枚の差分（クリックで切替）', en: '{n} variants (click to switch)' },
+  'gallery.prev': { ja: '前へ', en: 'Prev' },
+  'gallery.next': { ja: '次へ', en: 'Next' },
+  'gallery.page': { ja: 'ページ', en: 'Page' },
 
   'music.title': { ja: '音楽鑑賞', en: 'Music Room' },
   'music.trackCount': { ja: '{n} 曲', en: '{n} tracks' },
