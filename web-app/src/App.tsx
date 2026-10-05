@@ -6,7 +6,8 @@ import GameplayScreen from './components/GameplayScreen';
 import TitleScreen from './components/TitleScreen';
 import HistoryModal from './components/HistoryModal';
 import SettingsPanel from './components/SettingsPanel';
-import SavesModal from './components/SavesModal';
+import ArchivesModal from './components/ArchivesModal';
+import PageFlipper from './components/PageFlipper';
 import GalleryScreen from './components/GalleryScreen';
 import MusicRoom from './components/MusicRoom';
 
@@ -33,8 +34,6 @@ export default function App() {
     audio.sePlayer.volume = (sevol ?? 8) / 10;
     audio.voicePlayer.volume = (sevol ?? 8) / 10;
   }, [sevol, audio.sePlayer, audio.voicePlayer]);
-  const [savesMode, setSavesMode] = useState<null | 'save' | 'load'>(null);
-
   // Debug handle for browser-based soak testing.
   useEffect(() => { (window as any).__lavender = runner; }, [runner]);
 
@@ -54,7 +53,8 @@ export default function App() {
         if (e.key === 'Escape') {
           runner.setShowHistory(false);
           runner.setShowSettings(false);
-          setSavesMode(null);
+          runner.setShowArchives(false);
+          runner.setShowFlipper(false);
         }
         return;
       }
@@ -66,7 +66,8 @@ export default function App() {
         case 'Control': break;
         case 'Escape':
           if (runner.showHistory) runner.setShowHistory(false);
-          else if (savesMode) setSavesMode(null);
+          else if (runner.showFlipper) runner.setShowFlipper(false);
+          else if (runner.showArchives) runner.setShowArchives(false);
           else runner.setShowSettings(true);
           break;
         case 's': case 'S':
@@ -89,7 +90,7 @@ export default function App() {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keyup', onCtrl);
     };
-  }, [runner, savesMode]);
+  }, [runner]);
 
   if (!runner.metaReady) {
     return <div className="boot-screen">光輪の町、ラベンダーの少女<br /><span>Now Loading…</span></div>;
@@ -104,7 +105,7 @@ export default function App() {
         {runner.gameState === 'TITLE' && (
           <TitleScreen
             onStart={runner.startNewGame}
-            onContinue={() => setSavesMode('load')}
+            onContinue={() => runner.setShowArchives(true)}
             onGallery={() => runner.setGameState('GALLERY')}
             onMusic={() => runner.setGameState('MUSIC')}
             hasAutosave={!!runner.saveSlots.autosave}
@@ -131,23 +132,28 @@ export default function App() {
         {runner.showSettings && (
           <SettingsPanel runner={runner} onClose={() => runner.setShowSettings(false)} />
         )}
-        {savesMode && runner.gameState === 'PLAYING' && (
-          <SavesModal
-            mode={savesMode}
+        {runner.showArchives && (
+          <ArchivesModal
             slots={runner.saveSlots}
-            onSave={(id) => { runner.saveToSlot(id); setSavesMode(null); }}
-            onLoad={(slot) => { runner.loadSaveSlot(slot); setSavesMode(null); }}
+            playing={runner.gameState === 'PLAYING'}
+            currentScenario={runner.currentScenario}
+            currentPointer={runner.pointer}
+            currentSpeaker={runner.speaker}
+            currentDialogue={runner.dialogueText}
+            onSave={(id, meta) => runner.saveToSlot(id, meta)}
+            onLoad={(slot) => { runner.loadSaveSlot(slot as any); runner.setShowArchives(false); }}
             onDelete={(id) => runner.deleteSlot(id)}
-            onClose={() => setSavesMode(null)}
+            onUpdateMeta={(id, patch) => runner.updateSlotMeta(id, patch)}
+            onClose={() => runner.setShowArchives(false)}
           />
         )}
-        {savesMode === 'load' && runner.gameState === 'TITLE' && (
-          <SavesModal
-            mode="load"
-            slots={runner.saveSlots}
-            onLoad={(slot) => { runner.loadSaveSlot(slot); setSavesMode(null); }}
-            onDelete={(id) => runner.deleteSlot(id)}
-            onClose={() => setSavesMode(null)}
+        {runner.showFlipper && runner.gameState === 'PLAYING' && (
+          <PageFlipper
+            instructions={runner.scenarioInstructions}
+            pointer={runner.pointer}
+            scenario={runner.currentScenario}
+            onSeek={(ptr) => runner.seekToPointer(ptr)}
+            onClose={() => runner.setShowFlipper(false)}
           />
         )}
       </div>

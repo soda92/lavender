@@ -169,6 +169,17 @@ func SaveSlotToDB(username, slotID string, saveData map[string]any, historyLog [
 	})
 }
 
+func DeleteSlotFromDB(username, slotID string) error {
+	return DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("username = ? AND slot_id = ?", username, slotID).
+			Delete(&SaveProgress{}).Error; err != nil {
+			return err
+		}
+		return tx.Where("username = ? AND slot_id = ?", username, slotID).
+			Delete(&SaveSlot{}).Error
+	})
+}
+
 func SaveSFToDB(username string, sf map[string]any) error {
 	sfJSON, err := json.Marshal(sf)
 	if err != nil {

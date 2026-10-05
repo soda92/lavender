@@ -200,6 +200,9 @@ export function useKagRunner(audio: {
   const [showSettings, setShowSettings] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [showMusic, setShowMusic] = useState(false);
+  const [showArchives, setShowArchives] = useState(false);
+  const [showFlipper, setShowFlipper] = useState(false);
+  const [scenarioInstructions, setScenarioInstructions] = useState<any[]>([]);
   const [isAutoMode, setIsAutoMode] = useState(false);
   const [isFastForward, setIsFastForward] = useState(false);
   const [language, setLanguage] = useState<'JP' | 'EN'>('JP');
@@ -254,6 +257,10 @@ export function useKagRunner(audio: {
   const lastCommittedRef = useRef<StageState>(structuredClone(EMPTY_STAGE));
   const transitionTimerRef = useRef<any>(null);
   const transKeyRef = useRef(0);
+  // Page-flipper / deep-link seek: silently replay commands from the file
+  // start up to this pointer, rebuilding the stage without audio or waits.
+  const seekRef = useRef<number | null>(null);
+  const silentRef = useRef(false);
 
   useEffect(() => { fRef.current = f; }, [f]);
   useEffect(() => { sfRef.current = sfState; }, [sfState]);
@@ -277,6 +284,19 @@ export function useKagRunner(audio: {
       envinitRef.current = getMeta()!.envinit;
       setMetaReady(true);
       hydrate();
+      // Deep link: #/scenario/<file>/<pointer> (or #/<file>/<pointer>) boots
+      // straight into PLAYING and replays the file up to that pointer.
+      const hm = window.location.hash.match(/^#\/(?:scenario\/)?([^/]+)\/(\d+)\b/);
+      if (hm) {
+        const file = decodeURIComponent(hm[1]).replace(/\.ks$/i, '') + '.ks';
+        const ptr = parseInt(hm[2], 10);
+        stageRef.current = structuredClone(EMPTY_STAGE);
+        lastCommittedRef.current = structuredClone(EMPTY_STAGE);
+        historyRef.current = [];
+        setHistoryLog([]);
+        setGameState('PLAYING');
+        void loadScenario(file, null, null, { seek: ptr });
+      }
     });
     const beat = () => {
       fetch('/api/heartbeat', {
@@ -325,17 +345,22 @@ export function useKagRunner(audio: {
       if (state.sf) setSf(prev => ({ ...prev, ...state.sf }));
       const slots: Record<string, SaveSlot> = {};
       for (const [id, data] of Object.entries<any>(state.slots || {})) {
-        if (data?.stage) slots[id] = data as SaveSlot;
+        if (data && (data.stage || data.currentScenario)) slots[id] = data as SaveSlot;
       }
-      // local slot metadata (notes/pins)
-      for (let i = 0; i < 12; i++) {
-        const raw = localStorage.getItem(`${storagePrefix}_save_slot_${i}`);
-        if (raw) {
-          try {
-            const local = JSON.parse(raw);
-            if (slots[i]) slots[i] = { ...slots[i], note: local.note, pinned: local.pinned };
-          } catch { /* ignore */ }
+      // Unlimited dynamic slots: merge any local copies (server wins on
+      // overlap; note/pin are persisted server-side going forward).
+      const localIds: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i) || '';
+        if (key.startsWith(`${storagePrefix}_save_slot_`)) {
+          localIds.push(key.slice(`${storagePrefix}_save_slot_`.length));
         }
+      }
+      for (const id of localIds) {
+        try {
+          const local = JSON.parse(localStorage.getItem(`${storagePrefix}_save_slot_${id}`) || '{}');
+          slots[id] = { ...local, ...(slots[id] || {}) };
+        } catch { /* ignore */ }
       }
       const auto = localStorage.getItem(`${storagePrefix}_autosave`);
       if (auto) {
@@ -358,6 +383,7 @@ export function useKagRunner(audio: {
   };
 
   const setQuake = (h: number, v: number, time: number) => {
+    if (silentRef.current) return; // never shake during seek replay
     const key = Math.random();
     stageRef.current.quake = { h, v, key };
     commitStage();
@@ -371,6 +397,7 @@ export function useKagRunner(audio: {
   const playBgmTrack = (stem: string | null) => {
     bgmRef.current = stem;
     setBgmStem(stem);
+    if (silentRef.current) return; // seek replay: track state, make no sound
     if (stem) audio.playBgm(stem); else audio.stopBgm();
   };
 
@@ -396,6 +423,7 @@ export function useKagRunner(audio: {
     dataRef.current = data;
     scenarioRef.current = name;
     setCurrentScenario(name);
+    setScenarioInstructions(data);
     let start = 0;
     if (ptr != null) start = ptr;
     else if (label) {
@@ -411,7 +439,7 @@ export function useKagRunner(audio: {
     storage: string,
     label: string | null = null,
     overridePtr: number | null = null,
-    opts: { autostart?: boolean } = { autostart: true },
+    opts: { autostart?: boolean; seek?: number } = { autostart: true },
   ): Promise<boolean> => {
     const url = scenarioPath(storage);
     const res = await fetch(url);
@@ -424,7 +452,29 @@ export function useKagRunner(audio: {
     pendingChoicesRef.current = [];
     choiceOpenRef.current = false;
     setChoiceOptions(null);
-    applyScenarioData(name, json.instructions, label, overridePtr);
+    if (opts.seek != null) {
+      // Rebuild the scene by silently replaying from the file start; the seek
+      // pointer is the stop boundary handled inside runSlice.
+      stageRef.current = structuredClone(EMPTY_STAGE);
+      lastCommittedRef.current = structuredClone(EMPTY_STAGE);
+      transOpenRef.current = false;
+      clearTimeout(transitionTimerRef.current);
+      setStageTransition(null);
+      videoRef.current = null;
+      setVideo(null);
+      seekRef.current = Math.max(0, opts.seek);
+      silentRef.current = true;
+      speakerRef.current = '';
+      setSpeaker('');
+      setDialogueText('');
+      setTypewriterText('');
+      applyScenarioData(name, json.instructions, label, 0);
+      setStage(structuredClone(stageRef.current));
+    } else {
+      seekRef.current = null;
+      silentRef.current = false;
+      applyScenarioData(name, json.instructions, label, overridePtr);
+    }
     freshLineRef.current = true;
     if (opts.autostart !== false) {
       runningRef.current = false;
@@ -433,6 +483,18 @@ export function useKagRunner(audio: {
     return true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Page-flipper seek inside the currently loaded scenario.
+  const seekToPointer = useCallback((target: number) => {
+    const data = dataRef.current;
+    if (!data) return;
+    runTokenRef.current++;
+    runningRef.current = false;
+    if (typingRef.current) { clearInterval(typingRef.current.timer); typingRef.current = null; }
+    setGameState('PLAYING');
+    void loadScenario(`${scenarioRef.current.split('/').pop()}.ks`, null, null, { seek: target });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadScenario]);
 
   const startNewGame = useCallback(() => {
     stageRef.current = structuredClone(EMPTY_STAGE);
@@ -465,7 +527,7 @@ export function useKagRunner(audio: {
     });
     if (args.voice) {
       voiceRef.current = args.voice;
-      audio.playVoice(args.voice);
+      if (!silentRef.current) audio.playVoice(args.voice);
       setCurrentVoice(args.voice);
     }
     if (!hasVisualTokens && argv.length === 0) return; // voice/nameplate only
@@ -627,7 +689,7 @@ export function useKagRunner(audio: {
       const method = String(args.trans ?? '');
       const rawWait = args.transwait != null && args.transwait !== '' ? args.transwait : args.time;
       const waitMs = rawWait != null && rawWait !== '' ? (parseInt(String(rawWait), 10) || 0) : 0;
-      const skipping = fastRef.current || rangeSkipRef.current;
+      const skipping = fastRef.current || rangeSkipRef.current || seekRef.current != null;
       // No method (or explicit notrans): atomic cut.
       if (!method || method === 'notrans') {
         commitStage();
@@ -707,15 +769,20 @@ export function useKagRunner(audio: {
       commitStage();
       return 'continue';
     }
-    if (world.layers[name]) {
-      applyLayerArgs(world.layers[name], args, argv);
+    if (/^ev[_]/i.test(name) && mediaUrl(name)) {
+      // The framework event layer is a single slot: ev_<stem> tags set the
+      // current CG image (later tags swap it in place; bare [ev] retargets
+      // motion/position), while *_l partials stack on a separate slot.
+      const slot = /_l$/i.test(name) ? '__event_l__' : '__event__';
+      const ly = upsertLayer(slot, { file: name, front: true, level: 6, xpos: null, ypos: null });
+      applyLayerArgs(ly, args, argv);
+      ly.file = name; // re-addressing (e.g. 06a -> 06b) swaps the image
+      markCgSeen(name);
       commitStage();
       return 'continue';
     }
-    if (/^ev/i.test(name) && mediaUrl(name)) {
-      const ly = upsertLayer(name, { file: name, front: true, level: 6 });
-      applyLayerArgs(ly, args, argv);
-      markCgSeen(name);
+    if (world.layers[name]) {
+      applyLayerArgs(world.layers[name], args, argv);
       commitStage();
       return 'continue';
     }
@@ -786,7 +853,7 @@ export function useKagRunner(audio: {
     if (name === 'se' && (args.stop != null || argv.includes('stop'))) return 'continue';
     if (seRef || /^se[0-9_]/i.test(name)) {
       const stem = String(seRef || name);
-      if (mediaUrl(stem)) audio.playSe(stem);
+      if (mediaUrl(stem) && !silentRef.current) audio.playSe(stem);
       return 'continue';
     }
     if (name === 'allse' && argv.includes('stop')) return 'continue';
@@ -805,12 +872,15 @@ export function useKagRunner(audio: {
       world.quake = null; commitStage(); return 'continue';
     }
     if (name === 'wait') {
-      const t = parseInt(args.time || '200', 10);
-      if (fastRef.current) await sleep(30);
-      else await sleep(Math.min(t, 4000));
+      if (seekRef.current == null) {
+        const t = parseInt(args.time || '200', 10);
+        if (fastRef.current) await sleep(30);
+        else await sleep(Math.min(t, 4000));
+      }
       return 'continue';
     }
     if (name === 'waitclick' || name === 'waitvolume') {
+      if (seekRef.current != null) return 'continue'; // replay runs straight through
       // inline click wait
       waitingRef.current = true;
       setIsWaiting(true);
@@ -826,7 +896,7 @@ export function useKagRunner(audio: {
       }
       if (args.storage) {
         // Skipping through: do not play the movie.
-        if (fastRef.current || rangeSkipRef.current) return 'continue';
+        if (fastRef.current || rangeSkipRef.current || seekRef.current != null) return 'continue';
         setIsAutoMode(false); autoRef.current = false;
         playBgmTrack(null); // the movie carries its own audio
         const v = { stem: String(args.storage) };
@@ -985,6 +1055,22 @@ export function useKagRunner(audio: {
 
   const trailRef = useRef<Array<[string, number, string]>>([]);
 
+  const finishSeek = () => {
+    seekRef.current = null;
+    silentRef.current = false;
+    // A seek boundary inside an open trans block: reveal the draft as a cut.
+    if (transOpenRef.current) {
+      transOpenRef.current = false;
+      clearTimeout(transitionTimerRef.current);
+      setStageTransition(null);
+    }
+    commitStage();
+    waitingRef.current = true;
+    setIsWaiting(true);
+    freshLineRef.current = true;
+    if (bgmRef.current) audio.playBgm(bgmRef.current); else audio.stopBgm();
+  };
+
   const runSlice = useCallback(async () => {
     if (runningRef.current) return;
     runningRef.current = true;
@@ -995,8 +1081,12 @@ export function useKagRunner(audio: {
         if (myToken !== runTokenRef.current) break;
         const data = dataRef.current;
         if (!data) break;
+        if (seekRef.current != null && ptrRef.current >= seekRef.current) {
+          finishSeek();
+          break;
+        }
         if (ptrRef.current >= data.length) break;
-        if (choiceOpenRef.current) break;
+        if (seekRef.current == null && choiceOpenRef.current) break;
         if (--budget <= 0) {
           console.error('runSlice watchdog tripped', {
             scenario: scenarioRef.current,
@@ -1023,6 +1113,23 @@ export function useKagRunner(audio: {
         }
         if (inst.type === 'text') {
           const raw = String(inst.text_jp || inst.text || '');
+          if (seekRef.current != null) {
+            // Silent replay: refresh the shown line, but never wait/type/history.
+            const mm = raw.match(/^【([^】]+)】(.*)$/s);
+            if (mm || freshLineRef.current) {
+              const plate = (s: string) => { const i = s.indexOf('/'); return i >= 0 ? s.slice(i + 1) : s; };
+              speakerRef.current = mm ? plate(mm[1]) : '';
+              setSpeaker(speakerRef.current);
+              textVisibleRef.current = true;
+              setTextVisible(true);
+            }
+            setDialogueText(prev => (mm ? mm[2] : prev + raw));
+            setTypewriterText(mm ? mm[2] : raw);
+            voiceRef.current = '';
+            ptrRef.current++;
+            setPointer(ptrRef.current);
+            continue;
+          }
           // nameplate from leading 【name】; 【key/表示名】 shows only the
           // display override after the slash (used for ？？？ before reveals).
           const plateName = (s: string) => { const i = s.indexOf('/'); return i >= 0 ? s.slice(i + 1) : s; };
@@ -1068,6 +1175,7 @@ export function useKagRunner(audio: {
           freshLineRef.current = false;
           ptrRef.current++;
           setPointer(ptrRef.current);
+          if (seekRef.current != null) continue;
           waitingRef.current = true;
           setIsWaiting(true);
           break;
@@ -1077,7 +1185,31 @@ export function useKagRunner(audio: {
         const outcome = await handleCommand(inst);
         if (myToken !== runTokenRef.current) break;
         if (outcome === 'jump') {
-          // new scenario loaded; continue interpreting
+          // new scenario loaded; continue interpreting (a cross-file jump
+          // during a seek clears the seek and plays normally from there)
+          continue;
+        }
+        if (seekRef.current != null && outcome === 'stop') {
+          if (choiceOpenRef.current) {
+            // Auto-follow the first available branch during replay.
+            const opts = pendingChoicesRef.current;
+            pendingChoicesRef.current = [];
+            choiceOpenRef.current = false;
+            setChoiceOptions(null);
+            const opt = opts[0];
+            if (opt?.storage && opt.target.includes('|')) {
+              const [s, l] = opt.target.split('|');
+              await loadScenario(s || opt.storage, l);
+            } else if (opt?.storage) {
+              await loadScenario(opt.storage, opt.target);
+            } else if (opt?.target) {
+              jumpToLabel(opt.target);
+            }
+            continue;
+          }
+          // Timed waits / click waits / movies are skipped while seeking.
+          ptrRef.current++;
+          setPointer(ptrRef.current);
           continue;
         }
         ptrRef.current++;
@@ -1245,12 +1377,26 @@ export function useKagRunner(audio: {
     }).catch(() => {});
   };
 
-  const saveToSlot = useCallback((id: string | number) => {
+  const saveToSlot = useCallback((id: string | number, meta?: { note?: string; pinned?: boolean }) => {
     const data = buildSaveData();
     data.historyLog = historyRef.current.slice(-200);
+    const prev = saveSlots[String(id)];
+    if (meta?.note !== undefined) data.note = meta.note; else if (prev?.note) data.note = prev.note;
+    if (meta?.pinned !== undefined) data.pinned = meta.pinned; else if (prev?.pinned) data.pinned = true;
     writeSlot(String(id), data);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dialogueText]);
+  }, [dialogueText, saveSlots]);
+
+  // Edit note/pin on an existing slot without touching its scene snapshot.
+  const updateSlotMeta = useCallback((id: string | number, patch: { note?: string; pinned?: boolean }) => {
+    const cur = saveSlotsRef.current[String(id)];
+    if (!cur) return;
+    const next = { ...cur, ...patch };
+    writeSlot(String(id), next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const saveSlotsRef = useRef<Record<string, SaveSlot>>({});
+  useEffect(() => { saveSlotsRef.current = saveSlots; }, [saveSlots]);
 
   // autosave on each text stop
   useEffect(() => {
@@ -1315,6 +1461,15 @@ export function useKagRunner(audio: {
       return next;
     });
     localStorage.removeItem(`${storagePrefix}_save_slot_${id}`);
+    fetch('/api/delete-slot', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Username': usernameRef.current,
+        'X-Client-ID': clientIdRef.current,
+      },
+      body: JSON.stringify({ slot: String(id) }),
+    }).catch(() => {});
   }, []);
 
   const replayVoice = useCallback((stem: string) => {
@@ -1334,11 +1489,15 @@ export function useKagRunner(audio: {
     showSettings, setShowSettings,
     showGallery, setShowGallery,
     showMusic, setShowMusic,
+    showArchives, setShowArchives,
+    showFlipper, setShowFlipper,
+    scenarioInstructions, seekToPointer,
     isAutoMode, toggleAuto,
     isFastForward, toggleFastForward,
     language, setLanguage,
     f, setF, sf: sfState, setSf, tf,
-    startNewGame, loadScenario, loadSaveSlot, saveToSlot, quickLoad, deleteSlot, saveSlots,
+    startNewGame, loadScenario, loadSaveSlot, saveToSlot, quickLoad, deleteSlot,
+    updateSlotMeta, saveSlots,
     sessionConflict,
   };
 }

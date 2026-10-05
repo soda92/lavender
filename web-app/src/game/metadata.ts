@@ -130,6 +130,23 @@ export function getMeta(): Manifests | null {
   return cache;
 }
 
+/** Test helper: install prebuilt manifests without going through fetch. */
+export function __setManifestsForTest(m: {
+  fileMap?: Record<string, string>;
+  lowerMap?: Record<string, string>;
+  envinit: EnvInit;
+  charmeta: CharacterMeta;
+  scenarios?: ScenarioSummary[];
+}) {
+  cache = {
+    fileMap: m.fileMap || {},
+    lowerMap: m.lowerMap || {},
+    envinit: m.envinit,
+    charmeta: m.charmeta,
+    scenarios: m.scenarios || [],
+  };
+}
+
 /** Resolve a bare media stem (e.g. "bgm04", "hik_0000") to its web path. */
 export function mediaUrl(stem: string | undefined | null): string {
   if (!stem) return '';
@@ -206,7 +223,8 @@ export function classifyToken(charName: string, token: string): TokenKind {
     if (t.includes('LEVEL')) return 'level';
     if (t.includes('DISPPOSITION')) {
       const disp = pos.disp?.$const || '';
-      return disp.includes('NONE') || token.includes('消') ? 'hide' : 'show';
+      // BOTH （出） / BU （立） / FACE （顔） show; INVISIBLE （無） and CLEAR （消） hide.
+      return disp.includes('BOTH') || disp.includes('BU') || disp.includes('FACE') ? 'show' : 'hide';
     }
   }
   if (token === '出' || token === '立' || token === '入') return 'show';
@@ -326,8 +344,13 @@ export function renderCharacter(
     }
   }
 
-  const baseCanvas = (m.charmeta.poses[poseRef.base].canvas['1'] || canvas) as [number, number];
-  const scale = baseCanvas[1] / canvas[1];
+  // Per-level sheets are resolution variants of the same art (level-2 sheets
+  // are ~2x the pixels, not 2x the display size): every level is scaled so the
+  // canvas height maps to STAGE_H. The per-pose/per-level charlevel offsets
+  // (up/right positive) then choose the crop: level-2 y is ~-canvasH/2, which
+  // centers the sheet at stage height and presents the upper body as a 手前
+  // foreground composition. CharacterView positions by center anchor.
+  const scale = 1;
   const offs = ci.level_offsets?.[poseRef.pose]?.[level];
 
   return {

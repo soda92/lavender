@@ -43,20 +43,24 @@ const CharacterView: React.FC<{ ch: CharState }> = ({ ch }) => {
   );
   if (!rendered) return null;
 
-  // Level-1 art fills the stage height; level-2 close-ups overflow it.
-  const d = (STAGE_H * rendered.scale) / rendered.canvas[1];
+  // The canvas always maps to STAGE_H; level sheets differ only in pixel
+  // resolution. charlevel offsets are up/right-positive, so the canvas is
+  // center-anchored at stage center and shifted by (-offsetY, +offsetX).
+  const d = STAGE_H / rendered.canvas[1];
   const w = rendered.canvas[0] * d;
-  const left = STAGE_W / 2 + ch.xpos - w / 2;
+  const h = rendered.canvas[1] * d;
+  const left = STAGE_W / 2 + ch.xpos - w / 2 + rendered.offsetX * d;
+  const top = STAGE_H / 2 - h / 2 - rendered.offsetY * d;
 
   return (
     <div
       className="char-sprite"
       style={{
         position: 'absolute',
-        bottom: 0,
+        top,
         left,
         width: w,
-        height: STAGE_H,
+        height: h,
         opacity: ch.opacity != null ? ch.opacity / 255 : 1,
         zIndex: ch.front ? 40 : 20,
       }}
@@ -68,8 +72,8 @@ const CharacterView: React.FC<{ ch: CharState }> = ({ ch }) => {
           draggable={false}
           style={{
             position: 'absolute',
-            left: (rendered.body.x + rendered.offsetX) * d,
-            top: (rendered.body.y + rendered.offsetY) * d,
+            left: rendered.body.x * d,
+            top: rendered.body.y * d,
             width: rendered.body.w * d,
             height: rendered.body.h * d,
             opacity: rendered.body.opacity,
@@ -83,8 +87,8 @@ const CharacterView: React.FC<{ ch: CharState }> = ({ ch }) => {
           draggable={false}
           style={{
             position: 'absolute',
-            left: (rendered.face.x + rendered.offsetX) * d,
-            top: (rendered.face.y + rendered.offsetY) * d,
+            left: rendered.face.x * d,
+            top: rendered.face.y * d,
             width: rendered.face.w * d,
             height: rendered.face.h * d,
             opacity: rendered.face.opacity,
@@ -258,6 +262,8 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
         <button title="Auto" className={isAutoMode ? 'active' : ''} onClick={toggleAuto}>自動</button>
         <button title="Skip" className={isFastForward ? 'active' : ''} onClick={toggleFastForward}>スキップ</button>
         <button title="Backlog" onClick={() => setShowHistory(true)}>履歴</button>
+        <button title="Page flipper" onClick={() => runner.setShowFlipper(true)}>ページ</button>
+        <button title="Document archives" onClick={() => runner.setShowArchives(true)}>文書</button>
         <button title="Quick Load" onClick={quickLoad}>Q.Load</button>
         <button title="Quick Save" onClick={() => saveToSlot('q')}>Q.Save</button>
         <button title="Settings" onClick={() => setShowSettings(true)}>設定</button>

@@ -123,6 +123,30 @@ func SetupRouter(devMode bool, dataDir string) *gin.Engine {
 		c.JSON(http.StatusOK, gin.H{"success": true})
 	})
 
+	r.POST("/api/delete-slot", func(c *gin.Context) {
+		username := getUsername(c)
+		if !verifySession(username, c.GetHeader("X-Client-ID")) {
+			c.JSON(http.StatusConflict, gin.H{"error": "Session conflict: another window has ownership"})
+			return
+		}
+		var req struct {
+			Slot string `json:"slot"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+			return
+		}
+		if req.Slot == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "slot required"})
+			return
+		}
+		if err := db.DeleteSlotFromDB(username, req.Slot); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete slot: " + err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true})
+	})
+
 	r.POST("/api/save-sf", func(c *gin.Context) {
 		username := getUsername(c)
 		if !verifySession(username, c.GetHeader("X-Client-ID")) {
