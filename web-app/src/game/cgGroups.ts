@@ -1,16 +1,17 @@
 /**
  * Event CG grouping. The shipped evimage assets store one gallery CG as
  * multiple files: numbered letter variants (ev_akina_02a/02b/02c — the
- * expression/pose differences inside one still) plus a "_l" framing of each.
- * The G-senjou reference gallery folds all variants of one CG under a single
- * tile and lets the viewer page through them; these helpers derive the same
- * grouping automatically from the filename conventions.
+ * expression/pose differences inside one still). Each variant also ships an
+ * "_l" framing, but it is pixel-identical content, so those files are ignored
+ * here (they only survive as unlock aliases in the gallery). The G-senjou
+ * reference gallery folds all variants of one CG under a single tile and lets
+ * the viewer page through them; these helpers derive the same grouping
+ * automatically from the filename conventions.
  */
 
 export interface CgVariant {
   stem: string;
   url: string;
-  isL: boolean;
 }
 
 export interface CgGroup {
@@ -55,23 +56,18 @@ export function buildCgGroups(urls: string[]): CgGroup[] {
   const map = new Map<string, CgGroup>();
   for (const url of urls) {
     const stem = decodeURIComponent(url.split('/').pop() ?? '').replace(/\.[^.]+$/, '');
+    // The _l framing is the same image as its partner; never its own tile.
+    if (/_l$/i.test(stem)) continue;
     const id = cgGroupKey(stem);
     let g = map.get(id);
     if (!g) {
       g = { id, category: categoryOf(id), variants: [] };
       map.set(id, g);
     }
-    g.variants.push({ stem, url, isL: /_l$/i.test(stem) });
+    g.variants.push({ stem, url });
   }
   for (const g of map.values()) {
-    g.variants.sort((a, b) => {
-      // Keep letter variants (01a, 01b) in story order; only fold the _l
-      // framing directly behind its matching variant.
-      const base = naturalCompare(a.stem.replace(/_l$/i, ''), b.stem.replace(/_l$/i, ''));
-      if (base) return base;
-      if (a.isL !== b.isL) return a.isL ? 1 : -1;
-      return naturalCompare(a.stem, b.stem);
-    });
+    g.variants.sort((a, b) => naturalCompare(a.stem, b.stem));
   }
   return [...map.values()].sort((a, b) => naturalCompare(a.id, b.id));
 }

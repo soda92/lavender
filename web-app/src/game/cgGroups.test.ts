@@ -29,7 +29,7 @@ describe('categoryOf', () => {
 });
 
 describe('buildCgGroups', () => {
-  it('folds letter variants and _l frames under one ordered group', () => {
+  it('folds letter variants under one ordered group and drops _l frames', () => {
     const groups = buildCgGroups([
       '/evimage/ev_akina_01b_l.png',
       '/evimage/ev_akina_01a.png',
@@ -40,19 +40,20 @@ describe('buildCgGroups', () => {
       '/evimage/ev_haruka_01.png',
     ]);
     expect(groups.map(g => g.id)).toEqual(['ev_akina_01', 'ev_akina_03', 'ev_haruka_01']);
-    expect(groups[0].variants.map(v => v.stem)).toEqual([
-      'ev_akina_01a', 'ev_akina_01a_l', 'ev_akina_01b', 'ev_akina_01b_l',
-    ]);
-    expect(groups[1].variants.map(v => v.stem)).toEqual(['ev_akina_03', 'ev_akina_03_l']);
+    expect(groups[0].variants.map(v => v.stem)).toEqual(['ev_akina_01a', 'ev_akina_01b']);
+    expect(groups[1].variants.map(v => v.stem)).toEqual(['ev_akina_03']);
   });
 
   it('groups the two-letter 03aa/ab/ba/bb variants as one CG', () => {
     const [g] = buildCgGroups([
       'ev_hikaru_03aa.png', 'ev_hikaru_03ab.png',
       'ev_hikaru_03ba.png', 'ev_hikaru_03bb.png',
+      'ev_hikaru_03aa_l.png',
     ]);
     expect(g.id).toBe('ev_hikaru_03');
-    expect(g.variants).toHaveLength(4);
+    expect(g.variants.map(v => v.stem)).toEqual([
+      'ev_hikaru_03aa', 'ev_hikaru_03ab', 'ev_hikaru_03ba', 'ev_hikaru_03bb',
+    ]);
     expect(g.category).toBe('hikaru');
   });
 });

@@ -36,8 +36,8 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack }) => {
   }, []);
 
   const seen: Record<string, boolean> = sf.cgSeen || {};
-  const isVariantSeen = (v: CgVariant) =>
-    !!seen[v.stem] || (v.isL && !!seen[v.stem.replace(/_l$/, '')]);
+  // The engine may have recorded the (identical) _l framing as seen instead.
+  const isVariantSeen = (v: CgVariant) => !!seen[v.stem] || !!seen[`${v.stem}_l`];
   const unlockedVariants = (g: CgGroup) => g.variants.filter(isVariantSeen);
 
   const stats = useMemo(() => {
@@ -152,12 +152,17 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack }) => {
           {viewer.idx > 0 && (
             <button className="cg-viewer-nav prev" onClick={e => { e.stopPropagation(); stepViewer(-1); }}>‹</button>
           )}
+          {viewer.idx < viewer.variants.length - 1 && (
+            <button className="cg-viewer-nav next" onClick={e => { e.stopPropagation(); stepViewer(1); }}>›</button>
+          )}
           <img className="cg-zoom" src={cur.url} alt={cur.stem} onClick={e => e.stopPropagation()} draggable={false} />
-          <div className="cg-viewer-bar" onClick={e => e.stopPropagation()}>
-            <button onClick={() => stepViewer(-1)} disabled={viewer.idx === 0}>{t('gallery.prev')}</button>
-            <span>{viewer.idx + 1} / {viewer.variants.length}</span>
-            <button onClick={() => stepViewer(1)}>{t('gallery.next')}</button>
-          </div>
+          {viewer.variants.length > 1 && (
+            <div className="cg-viewer-bar" onClick={e => e.stopPropagation()}>
+              <button onClick={() => stepViewer(-1)} disabled={viewer.idx === 0}>{t('gallery.prev')}</button>
+              <span>{viewer.idx + 1} / {viewer.variants.length}</span>
+              <button onClick={() => stepViewer(1)}>{t('gallery.next')}</button>
+            </div>
+          )}
         </div>
       )}
     </div>
