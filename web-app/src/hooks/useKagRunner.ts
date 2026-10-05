@@ -960,9 +960,16 @@ export function useKagRunner(audio: {
 
     // ---- audio ----
     if (name === 'bgm') {
-      const ref = args.storage || args.file || args.name;
+      // Cues appear as [bgm storage=..], [bgm play=bgm28], the positional
+      // [bgm bgm02] form, or [bgm stop=2000] / [bgm stop] / [bgm wait].
+      const cueRef = args.storage || args.file || args.name || args.play
+        || argv.find((a: string) => /^bgm\d/i.test(a));
       if (args.stop != null || argv.includes('stop') || args.fadeout != null) playBgmTrack(null);
-      else if (ref) playBgmTrack(String(ref).replace(/\.\w+$/, ''));
+      else if (cueRef) {
+        const stem = String(cueRef).replace(/\.\w+$/, '');
+        playBgmTrack(stem);
+        setSf((p: any) => ({ ...p, bgmSeen: { ...(p.bgmSeen || {}), [stem]: true } }));
+      }
       return 'continue';
     }
     if (/^bgm/i.test(name)) {
