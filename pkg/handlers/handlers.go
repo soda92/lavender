@@ -193,6 +193,16 @@ func SetupRouter(devMode bool, dataDir string) *gin.Engine {
 		c.JSON(http.StatusOK, scenesIndex)
 	})
 
+	// BGM stem -> title map (engine main/soundlist.csv, Shift-JIS).
+	var (
+		soundOnce sync.Once
+		soundList map[string]string
+	)
+	r.GET("/api/soundlist", func(c *gin.Context) {
+		soundOnce.Do(func() { soundList = loadSoundList(dataDir) })
+		c.JSON(http.StatusOK, soundList)
+	})
+
 	// Media enumeration for the gallery / music room.
 	r.GET("/api/media", func(c *gin.Context) {
 		dir := c.Query("dir")

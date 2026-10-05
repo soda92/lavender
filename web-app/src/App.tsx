@@ -7,6 +7,7 @@ import TitleScreen from './components/TitleScreen';
 import SidePanel, { type SideTab } from './components/SidePanel';
 import GalleryScreen from './components/GalleryScreen';
 import MusicRoom from './components/MusicRoom';
+import DebugPanel from './components/DebugPanel';
 import { useT } from './game/i18n';
 
 export default function App() {
@@ -35,6 +36,10 @@ export default function App() {
   }, [sevol, audio.sePlayer, audio.voicePlayer]);
   // Debug handle for browser-based soak testing.
   useEffect(() => { (window as any).__lavender = runner; }, [runner]);
+
+  // Dev-only BGM/engine debugger overlay (toggled with D, like G-senjou).
+  const [debugOpen, setDebugOpen] = useState(false);
+  useEffect(() => { (window as any).__lavenderDebug = { open: () => setDebugOpen(true), close: () => setDebugOpen(false), toggle: () => setDebugOpen(v => !v) }; }, []);
 
   // Fit the 800x600 stage into the viewport; track size so side panels can
   // dock into the black letterbox space beside the stage.
@@ -80,11 +85,18 @@ export default function App() {
   // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const typingEl = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+      // D toggles the BGM debugger regardless of game state (G-senjou parity).
+      if ((e.key === 'd' || e.key === 'D') && !e.ctrlKey && !e.metaKey && !e.altKey && !typingEl) {
+        e.preventDefault();
+        setDebugOpen(prev => !prev);
+        return;
+      }
       if (runner.gameState !== 'PLAYING') {
         if (e.key === 'Escape') runner.setSideTab(null);
         return;
       }
-      const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+      const typing = typingEl;
       if (typing) return;
       switch (e.key) {
         case 'Enter': case 'ArrowRight': case 'ArrowDown':
@@ -187,6 +199,11 @@ export default function App() {
           onTab={openTab}
           onClose={() => runner.setSideTab(null)}
         />
+      )}
+
+      {/* Dev-only BGM/engine debugger (D to toggle); unscaled, click-safe. */}
+      {debugOpen && (
+        <DebugPanel runner={runner} audio={audio} onClose={() => setDebugOpen(false)} />
       )}
     </div>
   );
