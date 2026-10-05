@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { envYOffset, mediaUrl, renderCharacter, timeDef } from '../game/metadata';
+import { paintSpriteComposite } from '../game/spriteComposite';
 import type { StageState, CharState, DynLayer } from '../hooks/useKagRunner';
 
 const STAGE_W = 800;
@@ -41,6 +42,15 @@ const CharacterView: React.FC<{ ch: CharState }> = ({ ch }) => {
     }),
     [ch.name, ch.pose, ch.dress, ch.diff, ch.face, ch.level],
   );
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (!rendered?.body || !canvasRef.current) return;
+    let cancelled = false;
+    void paintSpriteComposite(rendered, canvasRef.current, () => !cancelled);
+    return () => { cancelled = true; };
+  }, [rendered]);
+
   if (!rendered) return null;
 
   // Native 1:1 pixels. The trimmed page is bottom-center anchored at
@@ -49,6 +59,8 @@ const CharacterView: React.FC<{ ch: CharState }> = ({ ch }) => {
   const { page } = rendered;
   const left = STAGE_W / 2 + ch.xpos + rendered.offsetX - page.w / 2;
   const top = STAGE_H / 2 + envYOffset() + rendered.offsetY - page.h;
+  // Face-only (顔 DISPPOSITION) sprites have no body to composite.
+  const composite = !!rendered.body;
 
   return (
     <div
@@ -91,6 +103,15 @@ const CharacterView: React.FC<{ ch: CharState }> = ({ ch }) => {
             height: rendered.face.h,
             opacity: rendered.face.opacity,
           }}
+        />
+      )}
+      {/* Single-bitmap composite over the stacked imgs: opaque once
+          painted (no face-plate seam under stage scaling); the previous
+          frame stays visible while a new composite builds. */}
+      {composite && (
+        <canvas
+          ref={canvasRef}
+          style={{ position: 'absolute', inset: 0, width: page.w, height: page.h }}
         />
       )}
     </div>
