@@ -50,17 +50,25 @@ export default function App() {
 
   const stageW = 800 * scale;
   const stageH = 600 * scale;
-  const stageLeft = (viewport.w - stageW) / 2;
   const stageTop = (viewport.h - stageH) / 2;
-  const stripW = viewport.w - (stageLeft + stageW); // right letterbox width
-  const PANEL_W = 340;
-  // Dock into the right letterbox strip whenever it is wide (~232px+);
-  // the panel width tracks the strip. Only on very narrow windows does it
-  // fall back to overlaying the stage's right edge.
+  const totalBlack = Math.max(0, viewport.w - stageW); // both side margins combined
+
+  // A side panel is open: the stage frame gets marginRight = panelW + gap
+  // (unscaled px; valid at any scale because its visual centering derives
+  // from its layout center), which shifts the scaled stage LEFT and frees
+  // the combined left+right letterbox space for the panel.
+  const panelOpen =
+    runner.showArchives || (runner.showFlipper && runner.gameState === 'PLAYING');
+  const panelW = Math.round(Math.min(380, totalBlack - 16));
+  const dockOutside = panelOpen && panelW >= 280;
+  const stageShift = dockOutside ? panelW + 16 : 0;
+  // Shifted visual geometry of the stage.
+  const stageLeft = dockOutside ? (totalBlack - panelW - 16) / 2 : (viewport.w - stageW) / 2;
+
   const dockStyle = (): CSSProperties =>
-    stripW >= 232
-      ? { left: stageLeft + stageW + 8, top: stageTop, width: Math.min(stripW - 16, 380), height: stageH }
-      : { left: stageLeft + stageW - PANEL_W - 6, top: stageTop, width: PANEL_W, height: stageH };
+    dockOutside
+      ? { left: stageLeft + stageW + 8, top: stageTop, width: panelW, height: stageH }
+      : { left: (viewport.w + stageW) / 2 - 346, top: stageTop, width: 340, height: stageH };
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -116,7 +124,7 @@ export default function App() {
     <div className="app-root">
       <div
         className="stage-frame"
-        style={{ width: 800, height: 600, transform: `scale(${scale})` }}
+        style={{ width: 800, height: 600, transform: `scale(${scale})`, marginRight: stageShift }}
       >
         {runner.gameState === 'TITLE' && (
           <TitleScreen
