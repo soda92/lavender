@@ -154,7 +154,7 @@ export default function App() {
           <TitleScreen
             onStart={runner.startNewGame}
             onContinue={() => runner.setSideTab('archives')}
-            onGallery={() => runner.setGameState('GALLERY')}
+            onGallery={() => { runner.setGalleryViewMode('cg'); runner.setGameState('GALLERY'); }}
             onMusic={() => runner.setGameState('MUSIC')}
             hasAutosave={!!runner.saveSlots.autosave}
             playBgm={audio.playBgm}
@@ -164,7 +164,12 @@ export default function App() {
         {runner.gameState === 'PLAYING' && <GameplayScreen runner={runner} />}
 
         {runner.gameState === 'GALLERY' && (
-          <GalleryScreen sf={runner.sf} onBack={() => runner.setGameState('TITLE')} />
+          <GalleryScreen
+            sf={runner.sf}
+            onBack={() => runner.setGameState('TITLE')}
+            initialViewMode={runner.galleryViewMode}
+            onPlayScene={runner.startSceneReplay}
+          />
         )}
         {runner.gameState === 'MUSIC' && (
           <MusicRoom onBack={() => runner.setGameState('TITLE')} audio={audio} />

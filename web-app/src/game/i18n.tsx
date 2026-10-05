@@ -85,6 +85,11 @@ const dict = {
   'archives.other': { ja: 'その他', en: 'Other' },
 
   'gallery.title': { ja: 'CG 鑑賞', en: 'CG Gallery' },
+  'gallery.tabCg': { ja: 'CG', en: 'CG' },
+  'gallery.tabScenes': { ja: 'シーン回想', en: 'Scene Review' },
+  'gallery.replay': { ja: '回想再生', en: 'Replay Scene' },
+  'gallery.reveal': { ja: 'クリックで表示', en: 'Click to reveal' },
+  'gallery.endScene': { ja: '回想終了', en: 'End Scene' },
   'gallery.toTitle': { ja: 'タイトルへ', en: 'To Title' },
   'gallery.catAll': { ja: 'すべて', en: 'All' },
   'gallery.catAkina': { ja: 'アキナ', en: 'Akina' },

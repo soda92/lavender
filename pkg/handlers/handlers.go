@@ -183,6 +183,16 @@ func SetupRouter(devMode bool, dataDir string) *gin.Engine {
 		c.JSON(http.StatusOK, index)
 	})
 
+	// Scene-recollection index (engine main/scenelist.csv).
+	var (
+		scenesOnce  sync.Once
+		scenesIndex []SceneInfo
+	)
+	r.GET("/api/scenes", func(c *gin.Context) {
+		scenesOnce.Do(func() { scenesIndex = loadSceneList(dataDir) })
+		c.JSON(http.StatusOK, scenesIndex)
+	})
+
 	// Media enumeration for the gallery / music room.
 	r.GET("/api/media", func(c *gin.Context) {
 		dir := c.Query("dir")

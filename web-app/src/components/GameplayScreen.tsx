@@ -219,6 +219,16 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
       {/* current scene */}
       <SceneView stage={stage} />
 
+      {/* recollection replay: quit back to the scene gallery */}
+      {runner.sceneReplay && (
+        <button
+          className="scene-exit"
+          onClick={e => { e.stopPropagation(); runner.finishSceneReplay(); }}
+        >
+          ✕ {t('gallery.endScene')}
+        </button>
+      )}
+
       {/* transition overlay: previous scene animating out */}
       {stageTransition && (
         <div

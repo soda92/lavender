@@ -262,6 +262,14 @@ export function useKagRunner(audio: {
   // start up to this pointer, rebuilding the stage without audio or waits.
   const seekRef = useRef<number | null>(null);
   const silentRef = useRef(false);
+  // Scene recollection (engine "scenemode"): play the memory_begin..memory_end
+  // span of a scenario and return to the gallery scene tab at the end label.
+  const sceneReplayRef = useRef<{ storage: string; endLabel: string } | null>(null);
+  const [sceneReplay, setSceneReplay] =
+    useState<{ storage: string; endLabel: string } | null>(null);
+  const [galleryViewMode, setGalleryViewMode] = useState<'cg' | 'scenes'>('cg');
+  // Indirection so the []-dep runSlice always calls the latest finisher.
+  const finishSceneReplayRef = useRef<() => void>(() => {});
 
   useEffect(() => { fRef.current = f; }, [f]);
   useEffect(() => { sfRef.current = sfState; }, [sfState]);
@@ -521,6 +529,8 @@ export function useKagRunner(audio: {
     runTokenRef.current++;
     runningRef.current = false;
     seekRef.current = null;
+    sceneReplayRef.current = null;
+    setSceneReplay(null);
     if (typingRef.current) { clearInterval(typingRef.current.timer); typingRef.current = null; }
     playBgmTrack(null);
     stageRef.current = structuredClone(EMPTY_STAGE);
@@ -547,6 +557,71 @@ export function useKagRunner(audio: {
     setGameState('TITLE');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Begin a recollection replay: load the scene file at its memory_begin
+  // label (engine scenelist.csv / scenemode.tjs semantics).
+  const startSceneReplay = useCallback(async (scene: {
+    storage: string; startLabel?: string; endLabel?: string;
+  }) => {
+    runTokenRef.current++;
+    runningRef.current = false;
+    if (typingRef.current) { clearInterval(typingRef.current.timer); typingRef.current = null; }
+    seekRef.current = null;
+    silentRef.current = false;
+    choiceOpenRef.current = false;
+    pendingChoicesRef.current = [];
+    setChoiceOptions(null);
+    historyRef.current = [];
+    setHistoryLog([]);
+    setChapterCard(null);
+    setSideTab(null);
+    setWindowHidden(false);
+    const marker = {
+      storage: scene.storage,
+      endLabel: scene.endLabel || 'memory_end',
+    };
+    sceneReplayRef.current = marker;
+    setSceneReplay(marker);
+    setGalleryViewMode('scenes');
+    setGameState('PLAYING');
+    const file = /\.ks$/i.test(scene.storage) ? scene.storage : `${scene.storage}.ks`;
+    await loadScenario(file, scene.startLabel || 'memory_begin');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadScenario]);
+
+  // Leave recollection (memory_end reached, or the player quits early) and
+  // return to the gallery, which opens on the scene tab.
+  const finishSceneReplay = useCallback(() => {
+    if (!sceneReplayRef.current) return;
+    runTokenRef.current++;
+    runningRef.current = false;
+    if (typingRef.current) { clearInterval(typingRef.current.timer); typingRef.current = null; }
+    playBgmTrack(null);
+    sceneReplayRef.current = null;
+    setSceneReplay(null);
+    seekRef.current = null;
+    silentRef.current = false;
+    stageRef.current = structuredClone(EMPTY_STAGE);
+    lastCommittedRef.current = structuredClone(EMPTY_STAGE);
+    transOpenRef.current = false;
+    clearTimeout(transitionTimerRef.current);
+    setStageTransition(null);
+    commitStage();
+    choiceOpenRef.current = false;
+    pendingChoicesRef.current = [];
+    setChoiceOptions(null);
+    videoRef.current = null;
+    setVideo(null);
+    setSpeaker(''); speakerRef.current = '';
+    setDialogueText(''); setTypewriterText('');
+    historyRef.current = [];
+    setHistoryLog([]);
+    setSideTab(null);
+    window.history.replaceState(null, '', '#');
+    setGameState('GALLERY');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  finishSceneReplayRef.current = finishSceneReplay;
 
   // -------------------------------------------------------------------------
   // Command handling
@@ -1124,7 +1199,14 @@ export function useKagRunner(audio: {
           if (trail.length > 40) trail.shift();
         }
 
-        if (inst.type === 'label' || inst.type === 'comment') { ptrRef.current++; continue; }
+        if (inst.type === 'label' || inst.type === 'comment') {
+          if (inst.type === 'label' && sceneReplayRef.current &&
+              inst.name === sceneReplayRef.current.endLabel) {
+            finishSceneReplayRef.current();
+            break;
+          }
+          ptrRef.current++; continue;
+        }
         if (inst.type === 'line_feed') { ptrRef.current++; continue; }
         if (inst.type === 'page_break' || inst.type === 'clear_text') {
           freshLineRef.current = true;
@@ -1207,6 +1289,12 @@ export function useKagRunner(audio: {
         if (outcome === 'jump') {
           // new scenario loaded; continue interpreting (a cross-file jump
           // during a seek clears the seek and plays normally from there)
+          // A recollection must never spill past its scene file.
+          const rep = sceneReplayRef.current;
+          if (rep && scenarioRef.current.split('/').pop() !== rep.storage) {
+            finishSceneReplayRef.current();
+            break;
+          }
           continue;
         }
         if (seekRef.current != null && outcome === 'stop') {
@@ -1400,6 +1488,7 @@ export function useKagRunner(audio: {
   };
 
   const saveToSlot = useCallback((id: string | number, meta?: { note?: string; pinned?: boolean }) => {
+    if (sceneReplayRef.current) return; // recollections cannot be bookmarked
     const data = buildSaveData();
     data.historyLog = historyRef.current.slice(-200);
     const prev = saveSlots[String(id)];
@@ -1424,6 +1513,7 @@ export function useKagRunner(audio: {
   useEffect(() => {
     if (gameState !== 'PLAYING' || !isWaiting) return;
     const t = setTimeout(() => {
+      if (sceneReplayRef.current) return; // no bookmarks in recollection
       const data = buildSaveData();
       data.historyLog = historyRef.current.slice(-200);
       setSaveSlots(prev => ({ ...prev, autosave: data }));
@@ -1434,6 +1524,9 @@ export function useKagRunner(audio: {
   }, [isWaiting, gameState, pointer]);
 
   const restoreSnapshot = useCallback((data: SaveSlot, autoplay = true) => {
+    // Loading a bookmark leaves any recollection replay.
+    sceneReplayRef.current = null;
+    setSceneReplay(null);
     setGameState('PLAYING');
     fRef.current = { ...(data.f || {}) };
     sfRef.current = { ...sfRef.current, ...(data.sf || {}) };
@@ -1519,6 +1612,7 @@ export function useKagRunner(audio: {
     language, setLanguage,
     f, setF, sf: sfState, setSf, tf,
     startNewGame, returnToTitle, loadScenario, loadSaveSlot, saveToSlot, quickLoad, deleteSlot,
+    sceneReplay, startSceneReplay, finishSceneReplay, galleryViewMode, setGalleryViewMode,
     updateSlotMeta, saveSlots,
     sessionConflict,
   };
