@@ -14,6 +14,7 @@ export interface ArchiveSlot {
 }
 
 interface Props {
+  dockStyle?: React.CSSProperties;
   slots: Record<string, ArchiveSlot>;
   playing: boolean;
   currentScenario?: string;
@@ -44,7 +45,7 @@ function shortFile(scenario?: string): string {
 }
 
 const ArchivesModal: React.FC<Props> = ({
-  slots, playing, currentScenario, currentPointer, currentSpeaker, currentDialogue,
+  dockStyle, slots, playing, currentScenario, currentPointer, currentSpeaker, currentDialogue,
   onSave, onLoad, onDelete, onUpdateMeta, onClose,
 }) => {
   const [tab, setTab] = useState<Tab>('recent');
@@ -140,15 +141,15 @@ const ArchivesModal: React.FC<Props> = ({
               <button onClick={() => { onUpdateMeta(id, {note: draft.trim()}); setEditing(null); }}>保存</button>
               <button onClick={() => setEditing(null)}>取消</button>
             </div>
-          ) : (
+          ) : (!isAuto || s.note) ? (
             <div
               className={`archive-note ${s.note ? 'has' : ''}`}
               onClick={() => { if (!isAuto) { setEditing(id); setDraft(s.note || ''); } }}
               title={isAuto ? undefined : 'クリックでメモを編集'}
             >
-              {s.note ? `📝 ${s.note}` : isAuto ? '' : 'メモを追加…'}
+              {s.note ? `📝 ${s.note}` : 'メモを追加…'}
             </div>
-          )}
+          ) : null}
           <div className="archive-line">
             {s.speaker && <b>{s.speaker}　</b>}
             <span>{(s.dialogueText || '…').replace(/\s+/g, ' ').slice(0, 60)}</span>
@@ -170,18 +171,17 @@ const ArchivesModal: React.FC<Props> = ({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-panel archives-panel" onClick={e => e.stopPropagation()}>
-        <div className="modal-head">
-          <h2>文書管理</h2>
-          <input
-            className="archives-search"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="メモ・台詞・場面を検索…"
-          />
-          <button onClick={onClose}>閉じる</button>
-        </div>
+    <div className="side-panel archives-panel" style={dockStyle}>
+      <div className="side-head">
+        <h2>文書管理</h2>
+        <button onClick={onClose}>×</button>
+      </div>
+      <input
+        className="archives-search"
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+        placeholder="メモ・台詞・場面を検索…"
+      />
 
         <div className="archives-tabs">
           <button className={tab === 'recent' ? 'on' : ''} onClick={() => setTab('recent')}>新着順</button>
@@ -209,18 +209,17 @@ const ArchivesModal: React.FC<Props> = ({
             : entries.map(e => renderCard(e.id, e.slot))}
         </div>
 
-        {confirmDel && (
-          <div className="modal-overlay sub" onClick={() => setConfirmDel(null)}>
-            <div className="confirm-box" onClick={e => e.stopPropagation()}>
-              <p>この文書を消去しますか？</p>
-              <div>
-                <button onClick={() => setConfirmDel(null)}>取消</button>
-                <button className="danger" onClick={() => { onDelete(confirmDel); setConfirmDel(null); }}>消去</button>
-              </div>
+      {confirmDel && (
+        <div className="side-sub" onClick={() => setConfirmDel(null)}>
+          <div className="confirm-box" onClick={e => e.stopPropagation()}>
+            <p>この文書を消去しますか？</p>
+            <div>
+              <button onClick={() => setConfirmDel(null)}>取消</button>
+              <button className="danger" onClick={() => { onDelete(confirmDel); setConfirmDel(null); }}>消去</button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

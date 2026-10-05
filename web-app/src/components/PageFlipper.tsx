@@ -1,6 +1,7 @@
 import React, {useEffect, useMemo, useState} from 'react';
 
 interface Props {
+  dockStyle?: React.CSSProperties;
   instructions: any[];
   pointer: number;
   scenario: string;
@@ -16,7 +17,7 @@ const stripName = (raw: string): {speaker: string; text: string} => {
   return {speaker: i >= 0 ? name.slice(i + 1) : name, text: m[2]};
 };
 
-const PageFlipper: React.FC<Props> = ({instructions, pointer, scenario, onSeek, onClose}) => {
+const PageFlipper: React.FC<Props> = ({dockStyle, instructions, pointer, scenario, onSeek, onClose}) => {
   const max = Math.max(0, instructions.length - 1);
   const [target, setTarget] = useState(Math.min(pointer, max));
 
@@ -49,13 +50,12 @@ const PageFlipper: React.FC<Props> = ({instructions, pointer, scenario, onSeek, 
   const jump = () => { onSeek(target); onClose(); };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-panel flipper-panel" onClick={e => e.stopPropagation()}>
-        <div className="modal-head">
-          <h2>ページ送り</h2>
-          <span className="flipper-scenario">{scenario.split('/').pop()}</span>
-          <button onClick={onClose}>閉じる</button>
-        </div>
+    <div className="side-panel flipper-panel" style={dockStyle}>
+      <div className="side-head">
+        <h2>ページ送り</h2>
+        <span className="flipper-scenario">{scenario.split('/').pop()}</span>
+        <button onClick={onClose}>×</button>
+      </div>
 
         <div className="flipper-position">
           <input
@@ -98,9 +98,8 @@ const PageFlipper: React.FC<Props> = ({instructions, pointer, scenario, onSeek, 
           {preview.length === 0 && <div className="archives-empty">この付近に台詞はありません</div>}
         </div>
 
-        <div className="flipper-hint">
-          移動すると、シナリオ先頭からその位置までを自動再生して場面を復元します（音声・動画は省略）。
-        </div>
+      <div className="flipper-hint">
+        移動すると、シナリオ先頭からその位置までを自動再生して場面を復元します（音声・動画は省略）。
       </div>
     </div>
   );
