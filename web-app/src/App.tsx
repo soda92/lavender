@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import './App.css';
 import { useGameAudio } from './hooks/useGameAudio';
 import { useKagRunner } from './hooks/useKagRunner';
@@ -69,6 +69,12 @@ export default function App() {
   const openTab = (tab: SideTab) =>
     runner.setSideTab(runner.sideTab === tab ? null : tab);
 
+  // Chord tracking so Ctrl is treated as a skip toggle only when it was
+  // pressed AND released on this page without a combo (S/L/R). A Ctrl keyup
+  // after a Ctrl+R reload must not start skipping.
+  const ctrlHeldRef = useRef(false);
+  const ctrlComboRef = useRef(false);
+
   // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -89,30 +95,46 @@ export default function App() {
         case 'i': case 'I':
           runner.setSf((prev: any) => ({ ...prev, immerseMode: !prev.immerseMode }));
           break;
-        case 'Control': break;
+        case 'Control':
+          ctrlHeldRef.current = true;
+          ctrlComboRef.current = false;
+          break;
         case 'Escape':
           if (runner.sideTab) runner.setSideTab(null);
           else runner.setSideTab('settings');
           break;
         case 's': case 'S':
-          if (e.ctrlKey) runner.saveToSlot('q'); break;
+          if (e.ctrlKey) { ctrlComboRef.current = true; runner.saveToSlot('q'); }
+          break;
         case 'l': case 'L':
-          if (e.ctrlKey) runner.quickLoad(); break;
+          if (e.ctrlKey) { ctrlComboRef.current = true; runner.quickLoad(); }
+          break;
         case 'j': case 'J':
           runner.toggleAuto(); break;
         case 'k': case 'K':
           runner.toggleFastForward(); break;
-        default: break;
+        default:
+          if (e.ctrlKey) ctrlComboRef.current = true;
+          break;
       }
     };
     const onCtrl = (e: KeyboardEvent) => {
-      if (e.key === 'Control' && runner.gameState === 'PLAYING') runner.toggleFastForward();
+      if (e.key !== 'Control') return;
+      const held = ctrlHeldRef.current;
+      const combo = ctrlComboRef.current;
+      ctrlHeldRef.current = false;
+      ctrlComboRef.current = false;
+      // Only a bare Control press/release on this page toggles skip.
+      if (held && !combo && runner.gameState === 'PLAYING') runner.toggleFastForward();
     };
+    const onBlur = () => { ctrlHeldRef.current = false; ctrlComboRef.current = false; };
     window.addEventListener('keydown', onKey);
     window.addEventListener('keyup', onCtrl);
+    window.addEventListener('blur', onBlur);
     return () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keyup', onCtrl);
+      window.removeEventListener('blur', onBlur);
     };
   }, [runner]);
 
