@@ -53,30 +53,28 @@ describe('classifyToken — art / position vocabulary', () => {
 });
 
 describe('renderCharacter — level sheets', () => {
-  it('level 1 canvas and offsets (akina pose C)', () => {
+  it('level 1 trimmed page and placement offsets (akina pose C)', () => {
     const r = renderCharacter('アキナ', {
       pose: 'ポーズＣ', dress: '制服', diff: '基本', face: 'テレ１', level: 1,
     })!;
-    expect(r.canvas).toEqual([277, 968]);
-    expect(r.refCanvasH).toBe(968);
-    expect(r.scale).toBe(1);
+    // Page is the union bounds of every manifest layer (full canvas here).
+    expect(r.page).toEqual({ x: 0, y: 0, w: 277, h: 968 });
+    // Drawn at native 1:1 pixels, bottom-center anchored at (400, 1000):
+    // top = 300 + 700 + 33 - 968 = 65, left = 400 + 16 - 277/2.
     expect(r.offsetX).toBe(16);
-    expect(r.offsetY).toBe(-33);
+    expect(r.offsetY).toBe(33); // charlevel y=-33 is up-positive
     expect(r.body?.url).toContain('akina_c_1_');
     expect(r.face).not.toBeNull();
   });
 
-  it('level 2 (手前) is the 2x zoom stage: 2x sheet, same ref scale, close-up offset', () => {
+  it('level 2 (手前) is the native 2x sheet framed near the top as a close-up', () => {
     const r = renderCharacter('アキナ', {
       pose: 'ポーズＣ', dress: '制服', diff: '基本', face: 'テレ１', level: 2,
     })!;
-    expect(r.canvas).toEqual([554, 1937]);
-    // Every level draws at the level-1 pixel scale, so the 2x sheet reads
-    // as a 2x foreground zoom rather than a shrunken full-body sheet.
-    expect(r.refCanvasH).toBe(968);
-    expect(r.scale).toBe(1);
+    expect(r.page).toEqual({ x: 0, y: 0, w: 554, h: 1937 });
+    // top = 300 + 700 + 951 - 1937 = 14: hair crown near the screen top.
     expect(r.offsetX).toBe(22);
-    expect(r.offsetY).toBe(-951);
+    expect(r.offsetY).toBe(951);
     expect(r.body?.url).toContain('akina_c_2_');
   });
 });

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { mediaUrl, renderCharacter, timeDef } from '../game/metadata';
+import { envYOffset, mediaUrl, renderCharacter, timeDef } from '../game/metadata';
 import type { StageState, CharState, DynLayer } from '../hooks/useKagRunner';
 
 const STAGE_W = 800;
@@ -43,14 +43,12 @@ const CharacterView: React.FC<{ ch: CharState }> = ({ ch }) => {
   );
   if (!rendered) return null;
 
-  // All level sheets share the level-1 pixel scale (zoom stages); the level-2
-  // sheet overflows the stage and is framed via its charlevel offset. Offsets
-  // are up/right-positive, center anchor shifted by (-offsetY, +offsetX).
-  const d = STAGE_H / rendered.refCanvasH;
-  const w = rendered.canvas[0] * d;
-  const h = rendered.canvas[1] * d;
-  const left = STAGE_W / 2 + ch.xpos - w / 2 + rendered.offsetX * d;
-  const top = STAGE_H / 2 - h / 2 - rendered.offsetY * d;
+  // Native 1:1 pixels. The trimmed page is bottom-center anchored at
+  // (400, 300 + env.yoffset); charlevel offsets are baked into
+  // rendered.offsetX/Y (x right-positive, y up-positive).
+  const { page } = rendered;
+  const left = STAGE_W / 2 + ch.xpos + rendered.offsetX - page.w / 2;
+  const top = STAGE_H / 2 + envYOffset() + rendered.offsetY - page.h;
 
   return (
     <div
@@ -59,8 +57,8 @@ const CharacterView: React.FC<{ ch: CharState }> = ({ ch }) => {
         position: 'absolute',
         top,
         left,
-        width: w,
-        height: h,
+        width: page.w,
+        height: page.h,
         opacity: ch.opacity != null ? ch.opacity / 255 : 1,
         zIndex: ch.front ? 40 : 20,
       }}
@@ -72,10 +70,10 @@ const CharacterView: React.FC<{ ch: CharState }> = ({ ch }) => {
           draggable={false}
           style={{
             position: 'absolute',
-            left: rendered.body.x * d,
-            top: rendered.body.y * d,
-            width: rendered.body.w * d,
-            height: rendered.body.h * d,
+            left: rendered.body.x,
+            top: rendered.body.y,
+            width: rendered.body.w,
+            height: rendered.body.h,
             opacity: rendered.body.opacity,
           }}
         />
@@ -87,10 +85,10 @@ const CharacterView: React.FC<{ ch: CharState }> = ({ ch }) => {
           draggable={false}
           style={{
             position: 'absolute',
-            left: rendered.face.x * d,
-            top: rendered.face.y * d,
-            width: rendered.face.w * d,
-            height: rendered.face.h * d,
+            left: rendered.face.x,
+            top: rendered.face.y,
+            width: rendered.face.w,
+            height: rendered.face.h,
             opacity: rendered.face.opacity,
           }}
         />

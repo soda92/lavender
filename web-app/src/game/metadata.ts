@@ -261,19 +261,23 @@ export interface RenderedSpritePart {
 }
 
 export interface RenderedSprite {
-  canvas: [number, number];
   /**
-   * Level-1 canvas height, the engine's reference resolution. EVERY level
-   * sheet is drawn at the same per-pixel scale STAGE_H/refCanvasH: level
-   * sheets are zoom stages (0 small, 1 normal, 2 large), and the per-level
-   * charlevel offsets crop the oversized sheet into its framing.
+   * Trimmed compositing page, in manifest pixels: the engine composites the
+   * pose on the PSD canvas and trims the union bounds of all layers at load,
+   * then draws the result at native 1:1 pixels (levels are pre-rendered zoom
+   * stages, not runtime-scaled sheets). Body/face coords are page-relative.
    */
-  refCanvasH: number;
-  scale: number;
+  page: { x: number; y: number; w: number; h: number };
   body: RenderedSpritePart | null;
   face: RenderedSpritePart | null;
+  /** Final placement offsets relative to the (center-x, baseline-y) anchor. */
   offsetX: number;
   offsetY: number;
+}
+
+/** Baseline y of the character anchor below stage center (envinit yoffset). */
+export function envYOffset(): number {
+  return cache?.envinit.yoffset ?? 0;
 }
 
 /**
@@ -351,24 +355,42 @@ export function renderCharacter(
     }
   }
 
-  // Levels are zoom stages (extractor convention: 0 = smallest), not mere
-  // resolution variants: every level sheet is rendered at the level-1 pixel
-  // scale, so the 2x level-2 sheet appears at 2x zoom and the per-pose /
-  // per-level charlevel offsets (sheet pixels, up/right positive) choose the
-  // crop — level-2 y ≈ -canvasH/2 frames the upper body as a 手前 close-up.
-  // CharacterView anchors the (oversized) sheet by stage center.
-  const scale = 1;
-  const refCanvasH = (meta.canvas['1'] || meta.canvas[levelKey] || canvas)[1];
+  // Engine placement (system/exstand.tjs): each level is a pre-rendered zoom
+  // stage drawn at native 1:1 pixels. The composited PSD page is trimmed at
+  // load to the union bounds of every non-auxiliary layer, then placed with a
+  // bottom-center anchor at (env.xmax, env.ymax + env.yoffset):
+  //   left = 400 + (poseX + charlevelX + xpos) - pageW/2
+  //   top  = 300 + (envY + poseY - charlevelY - ypos) - pageH
+  // charlevel y is up-positive in the CSV. Auxiliary marker layers
+  // (顔領域 etc., level 0 only) are excluded from the trim region.
+  const IGNORED = /領域|原点|背景/;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const l of layers) {
+    if (IGNORED.test(l.name)) continue;
+    if (l.width <= 0 || l.height <= 0) continue;
+    minX = Math.min(minX, l.left);
+    minY = Math.min(minY, l.top);
+    maxX = Math.max(maxX, l.left + l.width);
+    maxY = Math.max(maxY, l.top + l.height);
+  }
+  const page = isFinite(minX)
+    ? { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
+    : { x: 0, y: 0, w: canvas[0], h: canvas[1] };
+
   const offs = ci.level_offsets?.[poseRef.pose]?.[level];
+  const offsetX = (poseRef.xoffset ?? 0) + (offs?.x ?? 0);
+  const offsetY = (poseRef.yoffset ?? 0) - (offs?.y ?? 0);
+
+  // Shift the chosen body/face parts from canvas coords to page coords.
+  const toPage = (p: RenderedSpritePart | null): RenderedSpritePart | null =>
+    p ? { ...p, x: p.x - page.x, y: p.y - page.y } : null;
 
   return {
-    canvas,
-    refCanvasH,
-    scale,
-    body,
-    face,
-    offsetX: offs?.x ?? 0,
-    offsetY: offs?.y ?? 0,
+    page,
+    body: toPage(body),
+    face: toPage(face),
+    offsetX,
+    offsetY,
   };
 }
 
