@@ -548,11 +548,16 @@ button.danger { border-color: #b4555f; background: #4d2830; }
   cursor: pointer;
 }
 .scene-play:hover { filter: brightness(1.1); }
-.scene-play:disabled {
+/* Locked scenes remain launchable (watching unlocks them), like the
+   reference gallery: muted button instead of a disabled one. */
+.scene-card.locked .scene-play {
   background: rgba(255,255,255,0.1);
   box-shadow: none;
-  color: rgba(255,255,255,0.4);
-  cursor: default;
+  color: rgba(255,255,255,0.55);
+}
+.scene-card.locked .scene-play:hover {
+  filter: none;
+  background: rgba(255,255,255,0.16);
 }
 
 /* floating "end recollection" badge during scene replay */

@@ -561,7 +561,7 @@ export function useKagRunner(audio: {
   // Begin a recollection replay: load the scene file at its memory_begin
   // label (engine scenelist.csv / scenemode.tjs semantics).
   const startSceneReplay = useCallback(async (scene: {
-    storage: string; startLabel?: string; endLabel?: string;
+    storage: string; startLabel?: string; endLabel?: string; orig?: string;
   }) => {
     runTokenRef.current++;
     runningRef.current = false;
@@ -583,6 +583,10 @@ export function useKagRunner(audio: {
     sceneReplayRef.current = marker;
     setSceneReplay(marker);
     setGalleryViewMode('scenes');
+    // Like the reference gallery (and the engine's trail flags), launching a
+    // scene from the scene view unlocks it; every displayed CG tag is marked
+    // as the replay progresses as well.
+    markCgSeen(scene.orig);
     setGameState('PLAYING');
     const file = /\.ks$/i.test(scene.storage) ? scene.storage : `${scene.storage}.ks`;
     await loadScenario(file, scene.startLabel || 'memory_begin');

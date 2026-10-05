@@ -88,6 +88,7 @@ const dict = {
   'gallery.tabCg': { ja: 'CG', en: 'CG' },
   'gallery.tabScenes': { ja: 'シーン回想', en: 'Scene Review' },
   'gallery.replay': { ja: '回想再生', en: 'Replay Scene' },
+  'gallery.replayLocked': { ja: 'ロック中（再生すると解放）', en: 'Locked — play to unlock' },
   'gallery.reveal': { ja: 'クリックで表示', en: 'Click to reveal' },
   'gallery.endScene': { ja: '回想終了', en: 'End Scene' },
   'gallery.toTitle': { ja: 'タイトルへ', en: 'To Title' },

@@ -235,7 +235,7 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack, initialViewMode = 'cg', on
                   </div>
                   <button
                     className="scene-play"
-                    disabled={!open || !onPlayScene}
+                    title={!open ? t('gallery.replayLocked') : undefined}
                     onClick={() => onPlayScene?.(sc)}
                   >
                     ▶ {t('gallery.replay')}
