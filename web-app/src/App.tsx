@@ -4,10 +4,7 @@ import { useGameAudio } from './hooks/useGameAudio';
 import { useKagRunner } from './hooks/useKagRunner';
 import GameplayScreen from './components/GameplayScreen';
 import TitleScreen from './components/TitleScreen';
-import HistoryModal from './components/HistoryModal';
-import SettingsPanel from './components/SettingsPanel';
-import ArchivesModal from './components/ArchivesModal';
-import PageFlipper from './components/PageFlipper';
+import SidePanel, { type SideTab } from './components/SidePanel';
 import GalleryScreen from './components/GalleryScreen';
 import MusicRoom from './components/MusicRoom';
 
@@ -57,8 +54,7 @@ export default function App() {
   // (unscaled px; valid at any scale because its visual centering derives
   // from its layout center), which shifts the scaled stage LEFT and frees
   // the combined left+right letterbox space for the panel.
-  const panelOpen =
-    runner.showArchives || (runner.showFlipper && runner.gameState === 'PLAYING');
+  const panelOpen = runner.sideTab != null;
   const panelW = Math.round(Math.min(380, totalBlack - 16));
   const dockOutside = panelOpen && panelW >= 280;
   const stageShift = dockOutside ? panelW + 16 : 0;
@@ -70,16 +66,14 @@ export default function App() {
       ? { left: stageLeft + stageW + 8, top: stageTop, width: panelW, height: stageH }
       : { left: (viewport.w + stageW) / 2 - 346, top: stageTop, width: 340, height: stageH };
 
+  const openTab = (tab: SideTab) =>
+    runner.setSideTab(runner.sideTab === tab ? null : tab);
+
   // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (runner.gameState !== 'PLAYING') {
-        if (e.key === 'Escape') {
-          runner.setShowHistory(false);
-          runner.setShowSettings(false);
-          runner.setShowArchives(false);
-          runner.setShowFlipper(false);
-        }
+        if (e.key === 'Escape') runner.setSideTab(null);
         return;
       }
       const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
@@ -89,10 +83,8 @@ export default function App() {
           e.preventDefault(); runner.advance(); break;
         case 'Control': break;
         case 'Escape':
-          if (runner.showHistory) runner.setShowHistory(false);
-          else if (runner.showFlipper) runner.setShowFlipper(false);
-          else if (runner.showArchives) runner.setShowArchives(false);
-          else runner.setShowSettings(true);
+          if (runner.sideTab) runner.setSideTab(null);
+          else runner.setSideTab('settings');
           break;
         case 's': case 'S':
           if (e.ctrlKey) runner.saveToSlot('q'); break;
@@ -129,7 +121,7 @@ export default function App() {
         {runner.gameState === 'TITLE' && (
           <TitleScreen
             onStart={runner.startNewGame}
-            onContinue={() => runner.setShowArchives(true)}
+            onContinue={() => runner.setSideTab('archives')}
             onGallery={() => runner.setGameState('GALLERY')}
             onMusic={() => runner.setGameState('MUSIC')}
             hasAutosave={!!runner.saveSlots.autosave}
@@ -146,43 +138,17 @@ export default function App() {
           <MusicRoom onBack={() => runner.setGameState('TITLE')} audio={audio} />
         )}
 
-        {runner.showHistory && (
-          <HistoryModal
-            items={runner.historyLog}
-            onClose={() => runner.setShowHistory(false)}
-            onReplayVoice={runner.replayVoice}
-          />
-        )}
-        {runner.showSettings && (
-          <SettingsPanel runner={runner} onClose={() => runner.setShowSettings(false)} />
-        )}
       </div>
 
-      {/* Side panels dock into the letterbox space, never over the stage. */}
-      {runner.showArchives && (
-        <ArchivesModal
-          dockStyle={dockStyle()}
-          slots={runner.saveSlots}
+      {/* Unified docked panel: backlog / flipper / archives / settings. */}
+      {runner.sideTab && (
+        <SidePanel
+          tab={runner.sideTab as SideTab}
           playing={runner.gameState === 'PLAYING'}
-          currentScenario={runner.currentScenario}
-          currentPointer={runner.pointer}
-          currentSpeaker={runner.speaker}
-          currentDialogue={runner.dialogueText}
-          onSave={(id, meta) => runner.saveToSlot(id, meta)}
-          onLoad={(slot) => { runner.loadSaveSlot(slot as any); runner.setShowArchives(false); }}
-          onDelete={(id) => runner.deleteSlot(id)}
-          onUpdateMeta={(id, patch) => runner.updateSlotMeta(id, patch)}
-          onClose={() => runner.setShowArchives(false)}
-        />
-      )}
-      {runner.showFlipper && runner.gameState === 'PLAYING' && (
-        <PageFlipper
           dockStyle={dockStyle()}
-          instructions={runner.scenarioInstructions}
-          pointer={runner.pointer}
-          scenario={runner.currentScenario}
-          onSeek={(ptr) => runner.seekToPointer(ptr)}
-          onClose={() => runner.setShowFlipper(false)}
+          runner={runner}
+          onTab={openTab}
+          onClose={() => runner.setSideTab(null)}
         />
       )}
     </div>

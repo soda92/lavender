@@ -14,7 +14,6 @@ export interface ArchiveSlot {
 }
 
 interface Props {
-  dockStyle?: React.CSSProperties;
   slots: Record<string, ArchiveSlot>;
   playing: boolean;
   currentScenario?: string;
@@ -25,7 +24,6 @@ interface Props {
   onLoad: (slot: ArchiveSlot) => void;
   onDelete: (id: string | number) => void;
   onUpdateMeta: (id: string | number, patch: {note?: string; pinned?: boolean}) => void;
-  onClose: () => void;
 }
 
 type Tab = 'recent' | 'chapter' | 'pinned';
@@ -44,9 +42,9 @@ function shortFile(scenario?: string): string {
   return (scenario || '').split('/').pop() || scenario || '';
 }
 
-const ArchivesModal: React.FC<Props> = ({
-  dockStyle, slots, playing, currentScenario, currentPointer, currentSpeaker, currentDialogue,
-  onSave, onLoad, onDelete, onUpdateMeta, onClose,
+const ArchivesTab: React.FC<Props> = ({
+  slots, playing, currentScenario, currentPointer, currentSpeaker, currentDialogue,
+  onSave, onLoad, onDelete, onUpdateMeta,
 }) => {
   const [tab, setTab] = useState<Tab>('recent');
   const [query, setQuery] = useState('');
@@ -171,11 +169,7 @@ const ArchivesModal: React.FC<Props> = ({
   };
 
   return (
-    <div className="side-panel archives-panel" style={dockStyle}>
-      <div className="side-head">
-        <h2>文書管理</h2>
-        <button onClick={onClose}>×</button>
-      </div>
+    <div className="side-body archives-body">
       <input
         className="archives-search"
         value={query}
@@ -224,4 +218,4 @@ const ArchivesModal: React.FC<Props> = ({
   );
 };
 
-export default ArchivesModal;
+export default ArchivesTab;

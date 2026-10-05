@@ -196,12 +196,10 @@ export function useKagRunner(audio: {
   const [video, setVideo] = useState<{ stem: string } | null>(null);
   const videoRef = useRef<{ stem: string } | null>(null);
   const [historyLog, setHistoryLog] = useState<HistoryItem[]>([]);
-  const [showHistory, setShowHistory] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [showMusic, setShowMusic] = useState(false);
-  const [showArchives, setShowArchives] = useState(false);
-  const [showFlipper, setShowFlipper] = useState(false);
+  // Unified docked side panel: which tab is open, or null when closed.
+  const [sideTab, setSideTab] = useState<string | null>(null);
   const [scenarioInstructions, setScenarioInstructions] = useState<any[]>([]);
   const [isAutoMode, setIsAutoMode] = useState(false);
   const [isFastForward, setIsFastForward] = useState(false);
@@ -1485,12 +1483,10 @@ export function useKagRunner(audio: {
     choiceOptions, chooseOption,
     chapterCard, video, onVideoEnded: endVideo,
     bgmStem, currentVoice,
-    historyLog, showHistory, setShowHistory, replayVoice,
-    showSettings, setShowSettings,
+    historyLog, replayVoice,
+    sideTab, setSideTab,
     showGallery, setShowGallery,
     showMusic, setShowMusic,
-    showArchives, setShowArchives,
-    showFlipper, setShowFlipper,
     scenarioInstructions, seekToPointer,
     isAutoMode, toggleAuto,
     isFastForward, toggleFastForward,

@@ -1,12 +1,10 @@
 import React, {useEffect, useMemo, useState} from 'react';
 
 interface Props {
-  dockStyle?: React.CSSProperties;
   instructions: any[];
   pointer: number;
   scenario: string;
   onSeek: (pointer: number) => void;
-  onClose: () => void;
 }
 
 const stripName = (raw: string): {speaker: string; text: string} => {
@@ -17,7 +15,7 @@ const stripName = (raw: string): {speaker: string; text: string} => {
   return {speaker: i >= 0 ? name.slice(i + 1) : name, text: m[2]};
 };
 
-const PageFlipper: React.FC<Props> = ({dockStyle, instructions, pointer, scenario, onSeek, onClose}) => {
+const FlipperTab: React.FC<Props> = ({instructions, pointer, scenario, onSeek}) => {
   const max = Math.max(0, instructions.length - 1);
   const [target, setTarget] = useState(Math.min(pointer, max));
 
@@ -47,16 +45,13 @@ const PageFlipper: React.FC<Props> = ({dockStyle, instructions, pointer, scenari
 
   const preview = textRows.slice(Math.max(0, anchorIdx - 2), anchorIdx + 3);
   const step = (d: number) => setTarget(p => Math.max(0, Math.min(max, p + d)));
-  const jump = () => { onSeek(target); onClose(); };
+  const jump = () => onSeek(target);
 
   return (
-    <div className="side-panel flipper-panel" style={dockStyle}>
-      <div className="side-head">
-        <h2>ページ送り</h2>
+    <div className="side-body">
+      <div className="flipper-scenario-row">
         <span className="flipper-scenario">{scenario.split('/').pop()}</span>
-        <button onClick={onClose}>×</button>
       </div>
-
         <div className="flipper-position">
           <input
             type="number"
@@ -105,4 +100,4 @@ const PageFlipper: React.FC<Props> = ({dockStyle, instructions, pointer, scenari
   );
 };
 
-export default PageFlipper;
+export default FlipperTab;

@@ -171,7 +171,7 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
   const {
     stage, stageTransition, speaker, typewriterText, dialogueText, isWaiting, textVisible,
     advance, choiceOptions, chooseOption, chapterCard, video, onVideoEnded,
-    setShowSettings, setShowHistory, isAutoMode, toggleAuto,
+    isAutoMode, toggleAuto,
     isFastForward, toggleFastForward, quickLoad, saveToSlot,
   } = runner;
 
@@ -261,12 +261,12 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
       <div className="stage-controls" onClick={e => e.stopPropagation()}>
         <button title="Auto" className={isAutoMode ? 'active' : ''} onClick={toggleAuto}>自動</button>
         <button title="Skip" className={isFastForward ? 'active' : ''} onClick={toggleFastForward}>スキップ</button>
-        <button title="Backlog" onClick={() => setShowHistory(true)}>履歴</button>
-        <button title="Page flipper" onClick={() => runner.setShowFlipper(true)}>ページ</button>
-        <button title="Document archives" onClick={() => runner.setShowArchives(true)}>文書</button>
+        <button title="Backlog" onClick={e => { e.currentTarget.blur(); runner.setSideTab(runner.sideTab === 'history' ? null : 'history'); }}>履歴</button>
+        <button title="Page flipper" onClick={e => { e.currentTarget.blur(); runner.setSideTab(runner.sideTab === 'flipper' ? null : 'flipper'); }}>ページ</button>
+        <button title="Document archives" onClick={e => { e.currentTarget.blur(); runner.setSideTab(runner.sideTab === 'archives' ? null : 'archives'); }}>文書</button>
         <button title="Quick Load" onClick={quickLoad}>Q.Load</button>
         <button title="Quick Save" onClick={() => saveToSlot('q')}>Q.Save</button>
-        <button title="Settings" onClick={() => setShowSettings(true)}>設定</button>
+        <button title="Settings" onClick={e => { e.currentTarget.blur(); runner.setSideTab(runner.sideTab === 'settings' ? null : 'settings'); }}>設定</button>
       </div>
     </div>
     </div>
