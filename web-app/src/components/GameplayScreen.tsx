@@ -173,7 +173,9 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
     advance, choiceOptions, chooseOption, chapterCard, video, onVideoEnded,
     isAutoMode, toggleAuto,
     isFastForward, toggleFastForward, quickLoad, saveToSlot,
+    windowHidden, sf,
   } = runner;
+  const immerse = !!sf?.immerseMode;
 
   const shownText = typewriterText || (isWaiting ? dialogueText : dialogueText);
 
@@ -247,14 +249,26 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
       )}
 
       {/* dialogue */}
-      {textVisible && (shownText || speaker) && !choiceOptions && (
-        <div className={`dialogue-box ${!shownText ? 'empty' : ''}`}>
-          {speaker && <div className="speaker-plate">{speaker}</div>}
-          <div className="dialogue-text">{shownText}</div>
-          {isWaiting && typewriterText === dialogueText && dialogueText && (
-            <div className="click-glyph">▼</div>
-          )}
-        </div>
+      {textVisible && !windowHidden && (shownText || speaker) && !choiceOptions && (
+        immerse ? (
+          <div className="dialogue-immerse">
+            <div className="immerse-pill">
+              {speaker && <span className="immerse-speaker">［{speaker}］</span>}
+              <span className="immerse-text">{shownText}</span>
+              {isWaiting && typewriterText === dialogueText && dialogueText && (
+                <span className="click-glyph">▼</span>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className={`dialogue-box ${!shownText ? 'empty' : ''}`}>
+            {speaker && <div className="speaker-plate">{speaker}</div>}
+            <div className="dialogue-text">{shownText}</div>
+            {isWaiting && typewriterText === dialogueText && dialogueText && (
+              <div className="click-glyph">▼</div>
+            )}
+          </div>
+        )
       )}
 
       {/* controls */}

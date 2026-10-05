@@ -143,6 +143,42 @@ html, body, #root {
 }
 @keyframes blink { 50% { opacity: 0.2; } }
 
+/* immerse mode: frameless CC-style subtitle pill, layer is click-through */
+.dialogue-immerse {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding: 0 40px 72px;
+  pointer-events: none;
+}
+.immerse-pill {
+  max-width: 88%;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 10px 26px;
+  font-size: 19px;
+  line-height: 1.6;
+  text-align: center;
+  color: #fff;
+  text-shadow: 1px 1px 2px #000;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+}
+.immerse-speaker {
+  color: #a8ffb2;
+  font-weight: bold;
+  margin-right: 8px;
+}
+.immerse-text { white-space: pre-wrap; }
+.immerse-pill .click-glyph {
+  position: static;
+  margin-left: 8px;
+  color: #c3aef0;
+}
+
 .stage-controls {
   position: absolute;
   top: 8px;
@@ -282,6 +318,17 @@ button.danger { border-color: #b4555f; background: #4d2830; }
   font-size: 12px;
 }
 .settings-row input[type=range] { flex: 1; min-width: 0; accent-color: #9d7bd8; }
+.settings-row .seg-btn {
+  background: #221a38;
+  color: var(--ink);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.settings-row .seg-btn + .seg-btn { margin-left: 6px; }
+.settings-row .seg-btn.on { background: rgba(157, 123, 216, 0.45); }
 .settings-row .val { display: inline-block; width: 24px; text-align: right; }
 .settings-row select {
   background: #221a38;

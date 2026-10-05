@@ -79,8 +79,16 @@ export default function App() {
       const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
       if (typing) return;
       switch (e.key) {
-        case 'Enter': case ' ': case 'ArrowRight': case 'ArrowDown':
+        case 'Enter': case 'ArrowRight': case 'ArrowDown':
           e.preventDefault(); runner.advance(); break;
+        case ' ': case 'c': case 'C':
+          // Erase / restore the message window (G-senjou Space/C behavior).
+          e.preventDefault();
+          if (!e.repeat) runner.setWindowHidden(!runner.windowHidden);
+          break;
+        case 'i': case 'I':
+          runner.setSf((prev: any) => ({ ...prev, immerseMode: !prev.immerseMode }));
+          break;
         case 'Control': break;
         case 'Escape':
           if (runner.sideTab) runner.setSideTab(null);

@@ -18,6 +18,16 @@ const SettingsTab: React.FC<Props> = ({ runner }) => {
 
   return (
     <div className="side-body settings-body">
+      <Row label="表示モード">
+        <button
+          className={`seg-btn ${!sf.immerseMode ? 'on' : ''}`}
+          onClick={() => set({ immerseMode: false })}
+        >通常</button>
+        <button
+          className={`seg-btn ${sf.immerseMode ? 'on' : ''}`}
+          onClick={() => set({ immerseMode: true })}
+        >没入</button>
+      </Row>
       <Row label="BGM 音量">
         <input type="range" min={0} max={10} value={sf.vol ?? 8}
           onChange={e => set({ vol: Number(e.target.value) })} />
@@ -54,7 +64,7 @@ const SettingsTab: React.FC<Props> = ({ runner }) => {
       </Row>
 
       <div className="settings-hint">
-        ショートカット：Enter 次へ / J オート / K スキップ / Ctrl+S クイックセーブ / Ctrl+L ロード
+        ショートカット：Enter 次へ / Space ウィンドウ消去 / I 没入モード / J オート / K スキップ / Ctrl+S クイックセーブ / Ctrl+L ロード
       </div>
     </div>
   );

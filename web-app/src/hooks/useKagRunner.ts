@@ -200,6 +200,8 @@ export function useKagRunner(audio: {
   const [showMusic, setShowMusic] = useState(false);
   // Unified docked side panel: which tab is open, or null when closed.
   const [sideTab, setSideTab] = useState<string | null>(null);
+  // Manual message-window erase (Space), independent of script msgoff/msgon.
+  const [windowHidden, setWindowHidden] = useState(false);
   const [scenarioInstructions, setScenarioInstructions] = useState<any[]>([]);
   const [isAutoMode, setIsAutoMode] = useState(false);
   const [isFastForward, setIsFastForward] = useState(false);
@@ -211,6 +213,7 @@ export function useKagRunner(audio: {
     vol: 8,
     sevol: 8,
     skipMode: 'ALL',
+    immerseMode: false,
     readScenarios: {},
     bgmSeen: {},
     cgSeen: {},
@@ -1252,6 +1255,8 @@ export function useKagRunner(audio: {
     if (gameState !== 'PLAYING') return;
     if (choiceOpenRef.current) return;
     if (videoRef.current) { endVideo(); return; }
+    // Any advancement restores a manually hidden message window.
+    setWindowHidden(false);
     if (typingRef.current) {
       finishTyping();
       return;
@@ -1417,6 +1422,7 @@ export function useKagRunner(audio: {
     setF({ ...fRef.current }); setSfState({ ...sfRef.current }); setTf({ ...tfRef.current });
     if (data.stage) { stageRef.current = structuredClone(data.stage); commitStage(); }
     textVisibleRef.current = true; setTextVisible(true);
+    setWindowHidden(false);
     speakerRef.current = data.speaker || '';
     setSpeaker(data.speaker || '');
     setDialogueText(data.dialogueText || '');
@@ -1485,6 +1491,7 @@ export function useKagRunner(audio: {
     bgmStem, currentVoice,
     historyLog, replayVoice,
     sideTab, setSideTab,
+    windowHidden, setWindowHidden,
     showGallery, setShowGallery,
     showMusic, setShowMusic,
     scenarioInstructions, seekToPointer,
