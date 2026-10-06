@@ -135,6 +135,10 @@ export default function App() {
           runner.toggleAuto(); break;
         case 'k': case 'K':
           runner.toggleFastForward(); break;
+        case 'n': case 'N':
+          e.preventDefault();
+          openTab('navigator');
+          break;
         default:
           if (e.ctrlKey) ctrlComboRef.current = true;
           break;

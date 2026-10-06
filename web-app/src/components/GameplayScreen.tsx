@@ -490,9 +490,13 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
                 case 'qload':
                   if (sf?.confirmQLoad === false || await requestConfirm('クイックロード')) quickLoad();
                   break;
-                case 'save': case 'load': setSideTab('archives'); break;
+                case 'save': case 'load':
+                  setSideTab(sideTab === 'archives' ? null : 'archives');
+                  break;
                 case 'config': setConfigOpen(true); break;
-                case 'log': setSideTab('history'); break;
+                case 'log':
+                  setSideTab(sideTab === 'history' ? null : 'history');
+                  break;
                 case 'title': case 'exit':
                   if (await requestConfirm('タイトル')) setGameState('TITLE');
                   break;
