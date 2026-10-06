@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   CFG_PAGES, CFG_CHROME, CFG_SYSTEM, CFG_SOUND, CFG_DEFAULTS,
   cfgUrl, type CfgPage,
@@ -16,7 +16,10 @@ const Hit: React.FC<{
 }> = ({ x, y, w, h, onClick, onHover, cursor = 'var(--cur-over, pointer)', title }) => (
   <button
     className="cfg-hit"
-    style={{ position: 'absolute', left: x, top: y, width: w, height: h, cursor }}
+    style={{
+      position: 'absolute', left: x, top: y, width: w, height: h, cursor,
+      '--cur-hover': cursor.includes('cur-normal') ? 'normal' : 'over',
+    } as CSSProperties}
     title={title}
     onClick={e => { e.stopPropagation(); e.currentTarget.blur(); onClick(); }}
     onMouseEnter={onHover ? () => onHover(true) : undefined}
@@ -64,7 +67,7 @@ const SkinSlider: React.FC<{
       <div
         ref={trackRef}
         className="cfg-slider-track"
-        style={{ position: 'absolute', left: x, top: y - 7, width: w, height: 22, cursor: 'var(--cur-over, pointer)' }}
+        style={{ position: 'absolute', left: x, top: y - 7, width: w, height: 22, cursor: 'var(--cur-over, pointer)', '--cur-hover': 'over' } as CSSProperties}
         onPointerDown={e => {
           dragRef.current = true;
           setFromClient(e.clientX);
@@ -322,7 +325,8 @@ const SoundPage: React.FC<{ runner: any }> = ({ runner }) => {
               width: CFG_SOUND.smallKnob.trackW, height: 22,
               opacity: muted ? 0.4 : 1, pointerEvents: muted ? 'none' : 'auto',
               cursor: 'var(--cur-over, pointer)',
-            }}
+              '--cur-hover': 'over',
+            } as CSSProperties}
               onPointerDown={e => {
                 const el = e.currentTarget;
                 const move = (ev: PointerEvent) => {
