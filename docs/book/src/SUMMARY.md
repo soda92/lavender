@@ -29,4 +29,5 @@
 # Developers
 
 - [Debugging & deep links](./developers/debugging.md)
+- [Rare frame-glitch debugging](./developers/frame-glitch-debugging.md)
 - [Engine source references](./developers/engine-references.md)

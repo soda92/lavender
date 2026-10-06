@@ -51,7 +51,9 @@ curl -X POST http://localhost:38080/api/dev/restart-vite
 
 `game/debugTiming.ts` provides `useDebugTimeScale()` / `debugMs()` to inspect
 transitions and pans in slow motion; WAAPI durations multiply by the live
-scale.
+scale. Note the scale does not widen image decode/network races — for
+one-frame visual glitches see
+[Rare frame-glitch debugging](./frame-glitch-debugging.md).
 
 ## Audits
 
