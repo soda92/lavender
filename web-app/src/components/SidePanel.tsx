@@ -2,16 +2,14 @@ import React, { type CSSProperties } from 'react';
 import HistoryTab from './HistoryModal';
 import FlipperTab from './PageFlipper';
 import ArchivesTab from './ArchivesModal';
-import SettingsTab from './SettingsPanel';
 import { useT, type TKey } from '../game/i18n';
 
-export type SideTab = 'history' | 'flipper' | 'archives' | 'settings';
+export type SideTab = 'history' | 'flipper' | 'archives';
 
 const TABS: Array<{ id: SideTab; labelKey: TKey; playingOnly?: boolean }> = [
   { id: 'history', labelKey: 'tab.history', playingOnly: true },
   { id: 'flipper', labelKey: 'tab.flipper', playingOnly: true },
   { id: 'archives', labelKey: 'tab.archives' },
-  { id: 'settings', labelKey: 'tab.settings' },
 ];
 
 interface Props {
@@ -66,13 +64,23 @@ const SidePanel: React.FC<Props> = ({ tab, playing, dockStyle, runner, onTab, on
           currentPointer={runner.pointer}
           currentSpeaker={runner.speaker}
           currentDialogue={runner.dialogueText}
-          onSave={(id: string | number, meta?: {note?: string; pinned?: boolean}) => runner.saveToSlot(id, meta)}
-          onLoad={(slot: any) => { runner.loadSaveSlot(slot); onClose(); }}
+          onSave={async (id: string | number, meta?: {note?: string; pinned?: boolean}) => {
+            // 確認セーブ: ask before overwriting an occupied slot.
+            if (runner.saveSlots[String(id)]
+                && runner.sf?.confirmSave !== false
+                && !(await runner.requestConfirm('上書き'))) return;
+            runner.saveToSlot(id, meta);
+          }}
+          onLoad={async (slot: any) => {
+            if (runner.sf?.confirmLoad !== false
+                && !(await runner.requestConfirm('ロード'))) return;
+            runner.loadSaveSlot(slot);
+            onClose();
+          }}
           onDelete={(id: string | number) => runner.deleteSlot(id)}
           onUpdateMeta={(id: string | number, patch: {note?: string; pinned?: boolean}) => runner.updateSlotMeta(id, patch)}
         />
       )}
-      {tab === 'settings' && <SettingsTab runner={runner} />}
     </div>
   );
 };

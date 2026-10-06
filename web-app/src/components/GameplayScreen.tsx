@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { envYOffset, mediaUrl, renderCharacter, timeDef } from '../game/metadata';
 import { paintSpriteComposite, paintSpriteFace } from '../game/spriteComposite';
-import { SKIN, SYS_BUTTONS } from '../game/skin';
+import { SKIN, SKIN2, SYS_BUTTONS } from '../game/skin';
 import { useT } from '../game/i18n';
 import type { StageState, CharState, DynLayer } from '../hooks/useKagRunner';
 
@@ -162,7 +162,7 @@ interface Props {
  * sprite — current costume and expression — and clips it through the
  * soft-edge 顔mask. Only shown for a visible on-stage speaker.
  */
-const MiniFace: React.FC<{ ch: CharState }> = ({ ch }) => {
+const MiniFace: React.FC<{ ch: CharState; mask: string }> = ({ ch, mask }) => {
   const rendered = useMemo(
     () => renderCharacter(ch.name, {
       pose: ch.pose, dress: ch.dress, diff: ch.diff, face: ch.face, level: 0,
@@ -186,8 +186,8 @@ const MiniFace: React.FC<{ ch: CharState }> = ({ ch }) => {
       className="mes-face"
       style={{
         left: 0, top: 1, width: r.width, height: r.height,
-        WebkitMaskImage: `url(${SKIN.mesFaceMask})`,
-        maskImage: `url(${SKIN.mesFaceMask})`,
+        WebkitMaskImage: `url(${mask})`,
+        maskImage: `url(${mask})`,
       } as React.CSSProperties}
     />
   );
@@ -235,6 +235,7 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
     isFastForward, toggleFastForward, quickLoad, saveToSlot,
     windowHidden, setWindowHidden, sf,
     sideTab, setSideTab, setGameState, replayVoice, currentVoice,
+    configOpen, setConfigOpen, requestConfirm,
   } = runner;
   const t = useT();
   const immerse = !!sf?.immerseMode;
@@ -243,6 +244,12 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
     Object.values(stage.chars as Record<string, CharState>)
       .find(c => c.visible && c.name === speaker) || null
   );
+  // ウィンドウスタイル: "CG 表示中はシンプルなウィンドウを使用" — while an
+  // event CG layer is up, swap message01 for the message02 skin.
+  const eventCg = Object.keys(stage.layers as Record<string, DynLayer>).some(
+    k => k.includes('__event') && (stage.layers as Record<string, DynLayer>)[k]?.visible,
+  );
+  const simple = !!sf?.simpleEventWindow && eventCg;
   // Engine: whole frame opacity = sf.windowOpac/255 (default unset). The
   // shipped base panel is only ~89% white; the default multiplier gives
   // the semi-transparent reference look while the name plate keeps its
@@ -352,15 +359,15 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
         ) : (
           <div className="mes-window">
             <div className="mes-chrome">
-              <img className="mes-base" src={SKIN.mesBase} alt="" draggable={false} style={{ opacity: mesOpac }} />
-              <img className="mes-frame" src={SKIN.mesFrame} alt="" draggable={false} />
+              <img className="mes-base" src={simple ? SKIN2.mesBase : SKIN.mesBase} alt="" draggable={false} style={{ opacity: mesOpac }} />
+              {!simple && <img className="mes-frame" src={SKIN.mesFrame} alt="" draggable={false} />}
             </div>
-            {faceChar && <MiniFace ch={faceChar} />}
+            {faceChar && <MiniFace ch={faceChar} mask={simple ? SKIN2.mesFaceMask : SKIN.mesFaceMask} />}
             {speaker && (
               <>
                 <img
-                  className="mes-name-plate"
-                  src={SKIN.mesName}
+                  className={simple ? 'mes-name-line' : 'mes-name-plate'}
+                  src={simple ? SKIN2.mesName : SKIN.mesName}
                   alt=""
                   draggable={false}
                 />
@@ -383,17 +390,23 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
             const active =
               (b.id === 'auto' && isAutoMode) ||
               (b.id === 'skip' && isFastForward) ||
-              ((b.id === 'save' || b.id === 'load' || b.id === 'config' || b.id === 'log')
-                && sideTab === (b.id === 'save' || b.id === 'load' ? 'archives'
-                  : b.id === 'config' ? 'settings' : 'history'));
-            const onSys = () => {
+              (b.id === 'config' && configOpen) ||
+              ((b.id === 'save' || b.id === 'load' || b.id === 'log')
+                && sideTab === (b.id === 'save' || b.id === 'load' ? 'archives' : 'history'));
+            const onSys = async () => {
               switch (b.id) {
-                case 'qsave': saveToSlot('q'); break;
-                case 'qload': quickLoad(); break;
+                case 'qsave':
+                  if (sf?.confirmQSave === false || await requestConfirm('クイックセーブ')) saveToSlot('q');
+                  break;
+                case 'qload':
+                  if (sf?.confirmQLoad === false || await requestConfirm('クイックロード')) quickLoad();
+                  break;
                 case 'save': case 'load': setSideTab('archives'); break;
-                case 'config': setSideTab('settings'); break;
+                case 'config': setConfigOpen(true); break;
                 case 'log': setSideTab('history'); break;
-                case 'title': case 'exit': setGameState('TITLE'); break;
+                case 'title': case 'exit':
+                  if (await requestConfirm('タイトル')) setGameState('TITLE');
+                  break;
                 case 'auto': toggleAuto(); break;
                 case 'skip': toggleFastForward(); break;
                 case 'voice': replayVoice(currentVoice); break;

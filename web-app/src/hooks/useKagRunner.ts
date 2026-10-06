@@ -223,6 +223,17 @@ export function useKagRunner(audio: {
   const [showMusic, setShowMusic] = useState(false);
   // Unified docked side panel: which tab is open, or null when closed.
   const [sideTab, setSideTab] = useState<string | null>(null);
+  // Authentic full-stage config overlay (config_{system,sound,shortcut}).
+  const [configOpen, setConfigOpen] = useState(false);
+  const configOpenRef = useRef(false);
+  const setConfigOpenWrapped = useCallback((v: boolean) => {
+    configOpenRef.current = v;
+    setConfigOpen(v);
+  }, []);
+  // dialog.csv Yes/No popup: ask() resolves when the player answers.
+  const [askDialog, setAskDialog] = useState<string | null>(null);
+  const askResolverRef = useRef<((yes: boolean) => void) | null>(null);
+  const askOpenRef = useRef(false);
   // Manual message-window erase (Space), independent of script msgoff/msgon.
   const [windowHidden, setWindowHidden] = useState(false);
   const windowHiddenRef = useRef(false);
@@ -242,6 +253,26 @@ export function useKagRunner(audio: {
     readScenarios: {},
     bgmSeen: {},
     cgSeen: {},
+    // config overlay defaults (option.tjs CustomOption); progress keys
+    // (readScenarios/bgmSeen/cgSeen) are never reset by 初期化.
+    designCursor: true,
+    drawPos: 120,
+    showBGMTitle: true,
+    confirmSave: true,
+    confirmLoad: true,
+    confirmQSave: true,
+    confirmQLoad: true,
+    textPos: 32,
+    autoPos: 110,
+    simpleEventWindow: false,
+    masterVol: 80,
+    bgmVol: 80,
+    seVol: 80,
+    voiceVol: 80,
+    voiceCut: true,
+    bgmDown: false,
+    voiceMute: {},
+    voiceGain: {},
   });
   const [tf, setTf] = useState<Record<string, any>>({});
   const [saveSlots, setSaveSlots] = useState<Record<string, SaveSlot>>({});
@@ -849,7 +880,11 @@ export function useKagRunner(audio: {
         return 'continue';
       }
       const anim = transAnim(method);
-      const ms = waitMs || anim.ms;
+      // エフェクト速度 slider (drawPos 0..255): 120 = normal (1x),
+      // 0 = slow (2x duration), 255 = instant (0x). Matches the engine's
+      // drawspeed = (100-pos)/50 curve over the 0..200 slider range.
+      const drawFactor = Math.max(0, Math.min(2, 2 - (sfRef.current.drawPos ?? 120) / 120 * 1));
+      const ms = Math.round((waitMs || anim.ms) * drawFactor);
       const old = lastCommittedRef.current;
       commitStage(); // reveal the new scene underneath
       if (!skipping) {
@@ -857,7 +892,7 @@ export function useKagRunner(audio: {
         clearTimeout(transitionTimerRef.current);
         transitionTimerRef.current = setTimeout(() => setStageTransition(null), ms + 80);
       }
-      if (waitMs && !skipping) await sleep(waitMs);
+      if (waitMs && !skipping) await sleep(ms);
       return 'continue';
     }
 
@@ -1192,7 +1227,11 @@ export function useKagRunner(audio: {
     let i = prefix.length;
     // Mid-line [*] continuations keep the already-revealed prefix visible.
     setTypewriterText(full.slice(0, i));
-    const speed = (sfRef.current.textSpeed ?? 2); // chars per tick
+    // メッセージ速度 slider (config textPos 0..255) → chars/tick; legacy
+    // textSpeed (1..8) honored for old saves.
+    const speed = sfRef.current.textPos != null
+      ? 1 + Math.round((sfRef.current.textPos / 255) * 9)
+      : (sfRef.current.textSpeed ?? 2);
     const timer = setInterval(() => {
       i += speed;
       setTypewriterText(full.slice(0, i));
@@ -1490,9 +1529,30 @@ export function useKagRunner(audio: {
     void runSlice();
   }, [runSlice]);
 
+  // dialog.csv Yes/No confirmation used for save/load/title/reset asks.
+  const requestConfirm = useCallback((kind: string): Promise<boolean> => {
+    if (askResolverRef.current) {
+      askResolverRef.current(false);
+      askResolverRef.current = null;
+    }
+    return new Promise<boolean>(resolve => {
+      askResolverRef.current = resolve;
+      askOpenRef.current = true;
+      setAskDialog(kind);
+    });
+  }, []);
+
+  const answerConfirm = useCallback((yes: boolean) => {
+    setAskDialog(null);
+    askOpenRef.current = false;
+    askResolverRef.current?.(yes);
+    askResolverRef.current = null;
+  }, []);
+
   const advance = useCallback(() => {
     if (gameState !== 'PLAYING') return;
     if (choiceOpenRef.current) return;
+    if (configOpenRef.current || askOpenRef.current) return;
     if (videoRef.current) { endVideo(); return; }
     // When the window is erased (一時消去), the first click only restores
     // it — it must not advance the script.
@@ -1513,6 +1573,8 @@ export function useKagRunner(audio: {
       freshLineRef.current = true;
       voiceRef.current = '';
       setCurrentVoice('');
+      // ボイス非停止 OFF: a click cuts the playing voice clip.
+      if (sfRef.current.voiceCut === false) audio.stopVoice();
     }
     waitingRef.current = false;
     setIsWaiting(false);
@@ -1572,6 +1634,7 @@ export function useKagRunner(audio: {
   useEffect(() => {
     if (gameState !== 'PLAYING') return;
     if (!isWaiting || choiceOpenRef.current) return;
+    if (configOpenRef.current || askOpenRef.current) return;
     if (typingRef.current) return;
     if (isFastForward) {
       if (sfRef.current.skipMode === 'READ_ONLY' && !isRead(ptrRef.current - 1)) {
@@ -1584,7 +1647,10 @@ export function useKagRunner(audio: {
     }
     if (isAutoMode) {
       const len = dialogueText.length;
-      const t = setTimeout(() => advance(), Math.max(700, 40 + len * 90));
+      // オート進行速度 slider (autoPos 0..255): per-char ms ~350 (slow)
+      // → ~47 (fast), default pos 110 ≈ 90ms.
+      const perChar = Math.round(14000 / ((sfRef.current.autoPos ?? 110) + 40));
+      const t = setTimeout(() => advance(), Math.max(600, 40 + len * perChar));
       return () => clearTimeout(t);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1744,6 +1810,8 @@ export function useKagRunner(audio: {
     bgmStem, currentVoice,
     historyLog, replayVoice,
     sideTab, setSideTab,
+    configOpen, setConfigOpen: setConfigOpenWrapped,
+    askDialog, requestConfirm, answerConfirm,
     windowHidden, setWindowHidden,
     showGallery, setShowGallery,
     showMusic, setShowMusic,

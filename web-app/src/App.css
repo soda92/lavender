@@ -1358,3 +1358,49 @@ button.danger { border-color: #b4555f; background: #4d2830; }
   white-space: nowrap;
   flex-shrink: 1;
 }
+
+/* ------------------------------------------------------------------ */
+/* Authentic config overlay (config_system/sound/shortcut skins)      */
+/* ------------------------------------------------------------------ */
+.cfg-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 120;
+  user-select: none;
+}
+.cfg-overlay .cfg-base {
+  position: absolute;
+  inset: 0;
+  width: 800px;
+  height: 600px;
+  pointer-events: none;
+}
+.cfg-hit {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  display: block;
+}
+.cfg-hit:focus { outline: none; }
+.cfg-slider-track { touch-action: none; }
+
+/* dialog.csv Yes/No popup */
+.skin-dialog {
+  position: absolute;
+  inset: 0;
+  z-index: 130;
+  user-select: none;
+}
+.skin-dialog .cfg-hit { background: none; border: 0; padding: 0; }
+
+/* message02: thin name underline instead of the name plate */
+.mes-name-line {
+  position: absolute;
+  left: 0;
+  top: 49px;
+  width: 365px;
+  height: 2px;
+}

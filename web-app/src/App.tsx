@@ -5,6 +5,9 @@ import { useKagRunner } from './hooks/useKagRunner';
 import GameplayScreen from './components/GameplayScreen';
 import TitleScreen from './components/TitleScreen';
 import SidePanel, { type SideTab } from './components/SidePanel';
+import ConfigOverlay from './components/ConfigOverlay';
+import SkinDialog from './components/SkinDialog';
+import { CURSOR_DESIGN } from './game/skin';
 import GalleryScreen from './components/GalleryScreen';
 import MusicRoom from './components/MusicRoom';
 import DebugPanel from './components/DebugPanel';
@@ -12,28 +15,21 @@ import { useT } from './game/i18n';
 
 export default function App() {
   const t = useT();
-  const [bootVol, setBootVol] = useState(8);
-  const [bootSe, setBootSe] = useState(8);
-  useEffect(() => {
-    try {
-      const sf = JSON.parse(localStorage.getItem('lavender_sf') || '{}');
-      setBootVol(sf.vol ?? 8);
-      setBootSe(sf.sevol ?? 8);
-    } catch { /* ignore */ }
-  }, []);
 
-  // note: volumes are rebound after the runner hydrates system flags below.
-  const audio = useGameAudio(bootVol, bootSe);
+  // The runner owns persisted sf (including the 4 volume buses); bind the
+  // audio hook straight to it. Legacy vol/sevol (0..10) are migrated.
+  const audio = useGameAudio();
   const runner = useKagRunner(audio);
-  const vol = runner.sf?.vol ?? bootVol;
-  const sevol = runner.sf?.sevol ?? bootSe;
-  useEffect(() => {
-    audio.bgmPlayer.volume = (vol ?? 8) / 10;
-  }, [vol, audio.bgmPlayer]);
-  useEffect(() => {
-    audio.sePlayer.volume = (sevol ?? 8) / 10;
-    audio.voicePlayer.volume = (sevol ?? 8) / 10;
-  }, [sevol, audio.sePlayer, audio.voicePlayer]);
+  const sf = runner.sf || {};
+  audio.bindSettings(() => ({
+    master: sf.masterVol ?? 80,
+    bgm: sf.bgmVol ?? (sf.vol != null ? sf.vol * 10 : 80),
+    se: sf.seVol ?? (sf.sevol != null ? sf.sevol * 10 : 80),
+    voice: sf.voiceVol ?? (sf.sevol != null ? sf.sevol * 10 : 80),
+    bgmDown: !!sf.bgmDown,
+    voiceMute: sf.voiceMute || {},
+    voiceGain: sf.voiceGain || {},
+  }));
   // Debug handle for browser-based soak testing.
   useEffect(() => { (window as any).__lavender = runner; }, [runner]);
 
@@ -86,6 +82,8 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const typingEl = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+      // Modal overlays own the keyboard (Esc closes them).
+      if (runner.configOpen || runner.askDialog) return;
       // D toggles the BGM debugger regardless of game state (G-senjou parity).
       if ((e.key === 'd' || e.key === 'D') && !e.ctrlKey && !e.metaKey && !e.altKey && !typingEl) {
         e.preventDefault();
@@ -115,7 +113,7 @@ export default function App() {
           break;
         case 'Escape':
           if (runner.sideTab) runner.setSideTab(null);
-          else runner.setSideTab('settings');
+          else runner.setConfigOpen(true);
           break;
         case 's': case 'S':
           if (e.ctrlKey) { ctrlComboRef.current = true; runner.saveToSlot('q'); }
@@ -160,14 +158,20 @@ export default function App() {
     <div className="app-root">
       <div
         className="stage-frame"
-        style={{ width: 800, height: 600, transform: `scale(${scale})`, marginRight: stageShift }}
+        style={{
+          width: 800, height: 600,
+          transform: `scale(${scale})`, marginRight: stageShift,
+          cursor: sf.designCursor === false
+            ? 'default'
+            : `url(${CURSOR_DESIGN}) 0 0, default`,
+        }}
       >
         {runner.gameState === 'TITLE' && (
           <TitleScreen
             onStart={runner.startNewGame}
             onContinue={() => runner.setSideTab('archives')}
             onGallery={() => { runner.setGalleryViewMode('cg'); runner.setGameState('GALLERY'); }}
-            onSettings={() => runner.setSideTab('settings')}
+            onSettings={() => runner.setConfigOpen(true)}
             hasAutosave={!!runner.saveSlots.autosave}
             playBgm={audio.playBgm}
           />
@@ -190,6 +194,12 @@ export default function App() {
             audio={audio}
             seen={runner.sf?.bgmSeen || {}}
           />
+        )}
+
+        {/* authentic full-stage overlays (config + Yes/No asks) */}
+        {runner.configOpen && <ConfigOverlay runner={runner} />}
+        {runner.askDialog && (
+          <SkinDialog kind={runner.askDialog} onAnswer={runner.answerConfirm} />
         )}
 
       </div>
