@@ -46,47 +46,49 @@ html, body, #root {
 }
 .boot-screen span { display: block; margin-top: 20px; font-size: 14px; opacity: 0.6; }
 
-/* ---------- title ---------- */
+/* ---------- title (title.csv skin) ---------- */
 .title-screen {
   position: absolute;
   inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  padding-bottom: 70px;
-  background: linear-gradient(180deg, #0b0816 0%, #241a3d 70%, #3a2c5e 100%);
+  width: 800px;
+  height: 600px;
+  overflow: hidden;
 }
-.title-logo {
+.title-bg-skin {
   position: absolute;
-  top: 8%;
-  max-width: 78%;
-  max-height: 46%;
+  left: 0; top: 0;
+  width: 800px; height: 600px;
 }
-.title-menu {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  z-index: 2;
-}
-.title-menu button {
-  width: 280px;
-  padding: 10px 0;
-  font-size: 18px;
-  letter-spacing: 6px;
-  color: var(--ink);
-  background: rgba(30, 22, 48, 0.7);
-  border: 1px solid rgba(157, 123, 216, 0.5);
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.title-menu button:hover:not(:disabled) { background: rgba(90, 64, 140, 0.85); }
-.title-menu button:disabled { opacity: 0.35; cursor: default; }
-.title-foot {
+.title-logo-skin {
   position: absolute;
-  bottom: 12px;
-  font-size: 11px;
-  opacity: 0.5;
+  left: 146px; top: 23px;
+  width: 508px; height: 238px;
+  filter: drop-shadow(0 2px 6px rgba(60, 40, 90, 0.35));
+}
+/* 0cref art sits inside the menu cref rect (298,349,205,219) at +35,+10 */
+.title-menu-frame {
+  position: absolute;
+  left: 333px; top: 359px;
+  width: 135px; height: 208px;
+  pointer-events: none;
+}
+.title-menu-frame.over {
+  left: 298px; top: 349px;
+  width: 205px; height: 219px;
+}
+.title-menu-btn {
+  position: absolute;
+  left: 298px;
+  width: 205px; height: 43px;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+.title-row-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 16, 40, 0.45);
+  border-radius: 8px;
 }
 
 /* ---------- stage ---------- */
@@ -104,35 +106,52 @@ html, body, #root {
   100% { transform: translate(0, 0); }
 }
 
-.dialogue-box {
+/* ---- engine message01 skin ---- */
+.mes-window {
   position: absolute;
-  left: 30px;
-  right: 30px;
-  bottom: 18px;
-  min-height: 150px;
-  padding: 42px 34px 26px;
-  background: linear-gradient(180deg, rgba(10, 8, 18, 0.72), rgba(10, 8, 18, 0.9));
-  border: 1px solid rgba(157, 123, 216, 0.35);
-  border-radius: 6px;
+  left: 0; top: 399px;
+  width: 800px; height: 201px;
   z-index: 60;
-  cursor: pointer;
+  pointer-events: none;
 }
-.dialogue-box.empty { background: transparent; border-color: transparent; }
-.speaker-plate {
+.mes-base { position: absolute; left: 0; top: 0; width: 800px; height: 201px; }
+.mes-frame { position: absolute; left: 7px; top: 46px; width: 785px; height: 131px; }
+.mes-name-plate { position: absolute; left: 0; top: 19px; width: 353px; height: 31px; }
+.mes-name-text {
   position: absolute;
-  top: -20px;
-  left: 18px;
-  padding: 2px 18px;
-  background: linear-gradient(90deg, #5a408c, #9d7bd8);
-  border-radius: 4px;
-  font-weight: bold;
-  font-size: 16px;
-  letter-spacing: 2px;
-}
-.dialogue-text {
+  left: 159px; top: 23px; width: 183px; height: 24px;
+  display: flex; align-items: center; justify-content: flex-start;
+  color: #fff;
   font-size: 18px;
-  line-height: 1.75;
+  font-weight: bold;
+  letter-spacing: 2px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.75), 0 0 4px rgba(0,0,0,0.4);
+}
+.mes-text {
+  position: absolute;
+  left: 159px; top: 60px; width: 626px; height: 105px;
+  color: #18142f;
+  font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 35px;
   white-space: pre-wrap;
+  overflow: hidden;
+}
+.mes-glyph {
+  position: absolute;
+  left: 758px; top: 148px;
+  width: 27px; height: 21px;
+  overflow: hidden;
+}
+.mes-glyph img {
+  height: 21px;
+  width: 370.6px; /* 300 native * 21/17 */
+  animation: mes-glyph-step 0.79s steps(12) infinite;
+}
+@keyframes mes-glyph-step {
+  from { transform: translateX(0); }
+  to { transform: translateX(-339.7px); } /* 11 frames * 30.88 */
 }
 .click-glyph {
   position: absolute;
@@ -179,29 +198,38 @@ html, body, #root {
   color: #c3aef0;
 }
 
-.stage-controls {
+/* ---- message00 system button strip (0,580 800x20) ---- */
+.sys-bar {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  display: flex;
-  gap: 6px;
+  left: 0; top: 580px;
+  width: 800px; height: 20px;
   z-index: 70;
-  opacity: 0.25;
-  transition: opacity 0.2s;
 }
-.game-stage:hover .stage-controls { opacity: 1; }
-.stage-controls button {
+.sys-bar-bg { position: absolute; inset: 0; width: 800px; height: 20px; }
+.sys-btn {
+  position: absolute;
+  top: 1px; height: 18px;
+  padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 2px;
+  color: #eceaf4;
+  font-family: inherit;
   font-size: 12px;
-  padding: 4px 8px;
-  color: var(--ink);
-  background: var(--panel);
-  border: 1px solid #444;
-  border-radius: 3px;
+  letter-spacing: 0.5px;
   cursor: pointer;
 }
-.stage-controls button.active { background: #5a408c; border-color: var(--accent); }
+.sys-btn.kind-glyph { font-size: 10px; letter-spacing: -1px; }
+.sys-btn.kind-voice svg { display: block; }
+.sys-btn:hover { background: rgba(255, 255, 255, 0.18); }
+.sys-btn.on {
+  color: #f3dcff;
+  background: rgba(208, 127, 176, 0.45);
+  text-shadow: 0 0 6px rgba(233, 201, 255, 0.8);
+}
 
-/* ---------- choices ---------- */
+/* ---------- choices (select.csv skin) ---------- */
 .choices-overlay {
   position: absolute;
   inset: 0;
@@ -210,22 +238,28 @@ html, body, #root {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  background: rgba(0, 0, 0, 0.25);
+  gap: 13px;
 }
 .choice-btn {
-  min-width: 420px;
-  max-width: 700px;
-  padding: 12px 24px;
-  font-size: 17px;
-  color: var(--ink);
-  background: rgba(24, 18, 40, 0.9);
-  border: 1px solid var(--accent);
-  border-radius: 4px;
+  width: 736px;
+  height: 45px;
+  padding: 0;
+  border: none;
+  background-image: var(--choice-off);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-color: transparent;
+  color: #2b2645;
+  font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 1px;
   cursor: pointer;
-  transition: transform 0.1s, background 0.15s;
+  text-align: center;
 }
-.choice-btn:hover { background: #5a408c; transform: scale(1.02); }
+.choice-btn:hover {
+  background-image: var(--choice-over);
+}
 
 /* ---------- chapter card ---------- */
 .chapter-card {

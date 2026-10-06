@@ -223,6 +223,8 @@ export function useKagRunner(audio: {
   const [sideTab, setSideTab] = useState<string | null>(null);
   // Manual message-window erase (Space), independent of script msgoff/msgon.
   const [windowHidden, setWindowHidden] = useState(false);
+  const windowHiddenRef = useRef(false);
+  useEffect(() => { windowHiddenRef.current = windowHidden; }, [windowHidden]);
   const [scenarioInstructions, setScenarioInstructions] = useState<any[]>([]);
   const [isAutoMode, setIsAutoMode] = useState(false);
   const [isFastForward, setIsFastForward] = useState(false);
@@ -1437,8 +1439,13 @@ export function useKagRunner(audio: {
     if (gameState !== 'PLAYING') return;
     if (choiceOpenRef.current) return;
     if (videoRef.current) { endVideo(); return; }
-    // Any advancement restores a manually hidden message window.
-    setWindowHidden(false);
+    // When the window is erased (一時消去), the first click only restores
+    // it — it must not advance the script.
+    if (windowHiddenRef.current) {
+      windowHiddenRef.current = false;
+      setWindowHidden(false);
+      return;
+    }
     if (typingRef.current) {
       finishTyping();
       return;

@@ -16,7 +16,7 @@ export default defineConfig({
       '/api': { target: backendTarget, changeOrigin: true },
       '/meta': { target: backendTarget, changeOrigin: true },
       '/scenarios': { target: backendTarget, changeOrigin: true },
-      '^/(bgimage|bgm|sound|evimage|fgimage|voice|image|rule|video|thum|sysscn|system)': {
+      '^/(bgimage|bgm|sound|evimage|fgimage|voice|image|rule|video|thum|sysscn|system|uipsd)': {
         target: backendTarget,
         changeOrigin: true,
       },

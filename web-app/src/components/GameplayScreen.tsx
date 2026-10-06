@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { envYOffset, mediaUrl, renderCharacter, timeDef } from '../game/metadata';
 import { paintSpriteComposite } from '../game/spriteComposite';
+import { SKIN, SYS_BUTTONS } from '../game/skin';
 import { useT } from '../game/i18n';
 import type { StageState, CharState, DynLayer } from '../hooks/useKagRunner';
 
@@ -195,7 +196,8 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
     advance, choiceOptions, chooseOption, chapterCard, video, onVideoEnded,
     isAutoMode, toggleAuto,
     isFastForward, toggleFastForward, quickLoad, saveToSlot,
-    windowHidden, sf,
+    windowHidden, setWindowHidden, sf,
+    sideTab, setSideTab, setGameState, replayVoice, currentVoice,
   } = runner;
   const t = useT();
   const immerse = !!sf?.immerseMode;
@@ -270,9 +272,16 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
         </div>
       )}
 
-      {/* choices */}
+      {/* choices: select.csv button skin (32,184 736x45) */}
       {choiceOptions && (
-        <div className="choices-overlay" onClick={e => e.stopPropagation()}>
+        <div
+          className="choices-overlay"
+          style={{
+            '--choice-off': `url(${SKIN.choiceOff})`,
+            '--choice-over': `url(${SKIN.choiceOver})`,
+          } as React.CSSProperties}
+          onClick={e => e.stopPropagation()}
+        >
           {choiceOptions.map((opt: any, i: number) => (
             <button key={i} className="choice-btn" onClick={() => chooseOption(opt)}>
               {opt.text}
@@ -281,7 +290,7 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
         </div>
       )}
 
-      {/* dialogue */}
+      {/* dialogue: engine message01 skin (coordinates from message01.csv) */}
       {textVisible && !windowHidden && (shownText || speaker) && !choiceOptions && (
         immerse ? (
           <div className="dialogue-immerse">
@@ -294,27 +303,69 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
             </div>
           </div>
         ) : (
-          <div className={`dialogue-box ${!shownText ? 'empty' : ''}`}>
-            {speaker && <div className="speaker-plate">{speaker}</div>}
-            <div className="dialogue-text">{shownText}</div>
+          <div className="mes-window">
+            <img className="mes-base" src={SKIN.mesBase} alt="" draggable={false} />
+            <img className="mes-frame" src={SKIN.mesFrame} alt="" draggable={false} />
+            {speaker && (
+              <>
+                <img className="mes-name-plate" src={SKIN.mesName} alt="" draggable={false} />
+                <div className="mes-name-text">{speaker}</div>
+              </>
+            )}
+            <div className="mes-text">{shownText}</div>
             {isWaiting && typewriterText === dialogueText && dialogueText && (
-              <div className="click-glyph">▼</div>
+              <div className="mes-glyph"><img src={SKIN.clickGlyph} alt="" draggable={false} /></div>
             )}
           </div>
         )
       )}
 
-      {/* controls */}
-      <div className="stage-controls" onClick={e => e.stopPropagation()}>
-        <button title={t('control.auto')} className={isAutoMode ? 'active' : ''} onClick={toggleAuto}>{t('control.auto')}</button>
-        <button title={t('control.skip')} className={isFastForward ? 'active' : ''} onClick={toggleFastForward}>{t('control.skip')}</button>
-        <button title={t('tab.history')} onClick={e => { e.currentTarget.blur(); runner.setSideTab(runner.sideTab === 'history' ? null : 'history'); }}>{t('tab.history')}</button>
-        <button title={t('tab.flipper')} onClick={e => { e.currentTarget.blur(); runner.setSideTab(runner.sideTab === 'flipper' ? null : 'flipper'); }}>{t('tab.flipper')}</button>
-        <button title={t('tab.archives')} onClick={e => { e.currentTarget.blur(); runner.setSideTab(runner.sideTab === 'archives' ? null : 'archives'); }}>{t('tab.archives')}</button>
-        <button title={t('control.quickLoad')} onClick={quickLoad}>{t('control.quickLoad')}</button>
-        <button title={t('control.quickSave')} onClick={() => saveToSlot('q')}>{t('control.quickSave')}</button>
-        <button title={t('tab.settings')} onClick={e => { e.currentTarget.blur(); runner.setSideTab(runner.sideTab === 'settings' ? null : 'settings'); }}>{t('tab.settings')}</button>
-      </div>
+      {/* system button strip: message00 skin (0,580 800x20) */}
+      {!windowHidden && (
+        <div className="sys-bar" onClick={e => e.stopPropagation()}>
+          <img className="sys-bar-bg" src={SKIN.sysBar} alt="" draggable={false} />
+          {SYS_BUTTONS.map(b => {
+            const active =
+              (b.id === 'auto' && isAutoMode) ||
+              (b.id === 'skip' && isFastForward) ||
+              ((b.id === 'save' || b.id === 'load' || b.id === 'config' || b.id === 'log')
+                && sideTab === (b.id === 'save' || b.id === 'load' ? 'archives'
+                  : b.id === 'config' ? 'settings' : 'history'));
+            const onSys = () => {
+              switch (b.id) {
+                case 'qsave': saveToSlot('q'); break;
+                case 'qload': quickLoad(); break;
+                case 'save': case 'load': setSideTab('archives'); break;
+                case 'config': setSideTab('settings'); break;
+                case 'log': setSideTab('history'); break;
+                case 'title': case 'exit': setGameState('TITLE'); break;
+                case 'auto': toggleAuto(); break;
+                case 'skip': toggleFastForward(); break;
+                case 'voice': replayVoice(currentVoice); break;
+                case 'hide': setWindowHidden(true); break;
+              }
+            };
+            return (
+              <button
+                key={b.id}
+                className={`sys-btn kind-${b.kind} ${active ? 'on' : ''}`}
+                style={{ left: b.x, width: b.w }}
+                title={b.kind === 'text' ? b.label : b.id}
+                onClick={e => { e.currentTarget.blur(); onSys(); }}
+              >
+                {b.kind === 'text' ? b.label
+                  : b.kind === 'voice' ? (
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden>
+                      <path d="M3 9v6h4l5 5V4L7 9H3z" />
+                      <path d="M16 8a5 5 0 010 8" stroke="currentColor" strokeWidth="2" fill="none" />
+                      <path d="M18.5 5.5a9 9 0 010 13" stroke="currentColor" strokeWidth="2" fill="none" />
+                    </svg>
+                  ) : b.glyph}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
     </div>
   );

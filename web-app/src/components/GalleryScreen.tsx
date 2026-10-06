@@ -8,6 +8,7 @@ import {
 interface Props {
   sf: Record<string, any>;
   onBack: () => void;
+  onMusic?: () => void;
   initialViewMode?: 'cg' | 'scenes';
   onPlayScene?: (scene: SceneEntry) => void;
 }
@@ -27,7 +28,7 @@ const CAT_KEY: Record<string, TKey> = {
 
 interface ViewerState { group: CgGroup; variants: CgVariant[]; idx: number }
 
-const GalleryScreen: React.FC<Props> = ({ sf, onBack, initialViewMode = 'cg', onPlayScene }) => {
+const GalleryScreen: React.FC<Props> = ({ sf, onBack, onMusic, initialViewMode = 'cg', onPlayScene }) => {
   const t = useT();
   const [viewMode, setViewMode] = useState<'cg' | 'scenes'>(initialViewMode);
   const [groups, setGroups] = useState<CgGroup[]>([]);
@@ -142,6 +143,7 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack, initialViewMode = 'cg', on
           >{t('gallery.tabScenes')}</button>
         </div>
         <span className="extras-count">{curStats?.unlocked ?? 0} / {curStats?.total ?? 0}</span>
+        {onMusic && <button onClick={onMusic}>{t('music.title')}</button>}
         <button onClick={onBack}>{t('gallery.toTitle')}</button>
       </div>
 
