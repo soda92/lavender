@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useT, type TKey } from '../game/i18n';
-import { buildCgGroups, type CgGroup, type CgVariant } from '../game/cgGroups';
+import { useT } from '../game/i18n';
 import {
-  SCENE_HEROINES, isSceneUnlocked, sortScenes, type SceneEntry,
-} from '../game/scenes';
+  GALLERY_SECTIONS, buildFallbackSections, normalizeSections,
+  overlayUrl, type CgSection, type CgTile, type CgVariant,
+} from '../game/cgGroups';
+import { isSceneUnlocked, sortScenes, type SceneEntry } from '../game/scenes';
+import { CG_MEMORY } from '../game/skin';
 
 interface Props {
   sf: Record<string, any>;
@@ -13,95 +15,98 @@ interface Props {
   onPlayScene?: (scene: SceneEntry) => void;
 }
 
-const PER_PAGE = 12;
+interface ViewerState { tile: CgTile; variants: CgVariant[]; idx: number }
 
-const CATEGORY_ORDER = ['akina', 'haruka', 'hikaru', 'reika', 'riko', 'other'] as const;
-const CAT_KEY: Record<string, TKey> = {
-  all: 'gallery.catAll',
-  akina: 'gallery.catAkina',
-  haruka: 'gallery.catHaruka',
-  hikaru: 'gallery.catHikaru',
-  reika: 'gallery.catReika',
-  riko: 'gallery.catRiko',
-  other: 'gallery.catOther',
-};
-
-interface ViewerState { group: CgGroup; variants: CgVariant[]; idx: number }
+/** CSV rects use x/y/w/h; React inline styles want left/top/width/height. */
+const pos = (r: { x: number; y: number; w?: number; h: number }) => ({
+  left: r.x, top: r.y, width: r.w, height: r.h,
+});
 
 const GalleryScreen: React.FC<Props> = ({ sf, onBack, onMusic, initialViewMode = 'cg', onPlayScene }) => {
   const t = useT();
-  const [viewMode, setViewMode] = useState<'cg' | 'scenes'>(initialViewMode);
-  const [groups, setGroups] = useState<CgGroup[]>([]);
-  const [category, setCategory] = useState<string>('all');
+  const [mode, setMode] = useState<'cg' | 'scenes'>(initialViewMode);
+  const [sections, setSections] = useState<CgSection[]>([]);
+  const [scenes, setScenes] = useState<SceneEntry[]>([]);
+  const [tab, setTab] = useState<string>('all');
   const [page, setPage] = useState(1);
   const [viewer, setViewer] = useState<ViewerState | null>(null);
-  const [scenes, setScenes] = useState<SceneEntry[]>([]);
-  const [sceneHeroine, setSceneHeroine] = useState<string>('all');
-  // Spoiler guard: unlocked H-thumbnails stay blurred until explicitly
-  // revealed (mirrors the reference gallery's sensitive-asset toggle).
+  // Spoiler guard: unlocked scene thumbnails stay blurred until explicitly
+  // revealed (modern addition on top of the authentic album).
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    fetch('/api/media?dir=evimage')
+    let cancelled = false;
+    fetch('/api/cglist')
       .then(r => r.json())
-      .then((list: string[]) => setGroups(buildCgGroups(list.filter(p => /\.(png|jpg|jpeg)$/i.test(p)))));
+      .then(d => {
+        const norm = normalizeSections(d);
+        if (!cancelled) {
+          if (norm.some(s => s.tiles.length)) { setSections(norm); return; }
+          // Empty / unavailable index: fall back to filename grouping.
+          return fetch('/api/media?dir=evimage')
+            .then(r => r.json())
+            .then((list: string[]) =>
+              !cancelled && setSections(buildFallbackSections(
+                list.filter((p: string) => /\.(png|jpg|jpeg)$/i.test(p)))));
+        }
+      })
+      .catch(() => { if (!cancelled) setSections([]); });
     fetch('/api/scenes')
       .then(r => r.json())
-      .then((list: SceneEntry[]) => setScenes(sortScenes(list)));
+      .then((list: SceneEntry[]) => !cancelled && setScenes(sortScenes(list)));
+    return () => { cancelled = true; };
   }, []);
 
+  // Switching the mode / character tab restarts paging.
+  useEffect(() => { setPage(1); }, [mode, tab]);
+
   const seen: Record<string, boolean> = sf.cgSeen || {};
-  // The engine may have recorded the (identical) _l framing as seen instead.
   const isVariantSeen = (v: CgVariant) => !!seen[v.stem] || !!seen[`${v.stem}_l`];
-  const unlockedVariants = (g: CgGroup) => g.variants.filter(isVariantSeen);
+  const tileUnlocked = (tile: CgTile) => tile.variants.some(isVariantSeen);
+  const unlockedTiles = (list: CgTile[]) => list.filter(tileUnlocked);
 
-  const stats = useMemo(() => {
-    const s: Record<string, { total: number; unlocked: number }> = { all: { total: 0, unlocked: 0 } };
-    for (const c of CATEGORY_ORDER) s[c] = { total: 0, unlocked: 0 };
-    for (const g of groups) {
-      const open = unlockedVariants(g).length > 0;
-      s.all.total++; if (open) s.all.unlocked++;
-      if (s[g.category]) { s[g.category].total++; if (open) s[g.category].unlocked++; }
-    }
-    return s;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groups, seen]);
+  const sectionMap = useMemo(() => new Map(sections.map(s => [s.id, s])), [sections]);
 
-  const sceneStats = useMemo(() => {
-    const s: Record<string, { total: number; unlocked: number }> = { all: { total: 0, unlocked: 0 } };
-    for (const h of SCENE_HEROINES) s[h] = { total: 0, unlocked: 0 };
-    for (const sc of scenes) {
-      const open = isSceneUnlocked(seen, sc);
-      s.all.total++; if (open) s.all.unlocked++;
-      if (s[sc.heroine]) { s[sc.heroine].total++; if (open) s[sc.heroine].unlocked++; }
-    }
-    return s;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenes, seen]);
-
-  const filteredScenes = useMemo(
-    () => (sceneHeroine === 'all' ? scenes : scenes.filter(s => s.heroine === sceneHeroine)),
-    [scenes, sceneHeroine],
+  // --- CG mode data -------------------------------------------------------
+  const cgTiles = useMemo(
+    () => tab === 'all'
+      ? sections.flatMap(s => s.tiles)
+      : sectionMap.get(tab)?.tiles ?? [],
+    [sections, tab, sectionMap],
   );
 
-  const filtered = useMemo(
-    () => (category === 'all' ? groups : groups.filter(g => g.category === category)),
-    [groups, category],
+  // --- Scene mode data ----------------------------------------------------
+  const sceneList = useMemo(
+    () => (tab === 'all' || tab === 'other'
+      ? scenes
+      : scenes.filter(s => s.heroine === tab)),
+    [scenes, tab],
   );
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+
+  const perPage = mode === 'cg' ? CG_MEMORY.cg.perPage : CG_MEMORY.scene.perPage;
+  const pageItems = mode === 'cg' ? cgTiles : sceneList;
+  const pageCount = Math.max(1, Math.ceil(pageItems.length / perPage));
   const safePage = Math.min(page, pageCount);
-  const pageItems = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
+  const pageSlice = pageItems.slice((safePage - 1) * perPage, safePage * perPage);
 
-  useEffect(() => { setPage(1); }, [category]);
+  const countFor = (id: string): { unlocked: number; total: number } => {
+    if (mode === 'cg') {
+      const list = id === 'all' ? cgTilesBase(sections) : sectionMap.get(id)?.tiles ?? [];
+      return { unlocked: unlockedTiles(list).length, total: list.length };
+    }
+    const list = id === 'all' ? scenes : scenes.filter(s => s.heroine === id);
+    return { unlocked: list.filter(s => isSceneUnlocked(seen, s)).length, total: list.length };
+  };
+  const currentCount = countFor(tab);
 
-  const openGroup = (g: CgGroup) => {
-    const variants = unlockedVariants(g);
-    if (variants.length) setViewer({ group: g, variants, idx: 0 });
+  const openTile = (tile: CgTile) => {
+    const variants = tile.variants.filter(isVariantSeen);
+    if (variants.length) setViewer({ tile, variants, idx: 0 });
   };
   const stepViewer = (d: number) => setViewer(v => {
     if (!v) return v;
     const idx = v.idx + d;
-    // Clicking past the last variant closes the viewer (matches the engine).
+    // Clicking past the last variant returns to the grid (engine behavior).
     if (idx >= v.variants.length) return null;
     return { ...v, idx: Math.max(0, idx) };
   });
@@ -119,8 +124,14 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack, onMusic, initialViewMode =
     return () => window.removeEventListener('keydown', onKey);
   }, [viewer]);
 
-  const cur = viewer && viewer.variants[viewer.idx];
-  const curStats = viewMode === 'cg' ? stats[category] : sceneStats[sceneHeroine];
+  const cur = viewer?.variants[viewer.idx];
+
+  // Pager: engine shows four numbered slots at a time.
+  const groupSize = CG_MEMORY.pager.groupSize;
+  const groupStart = Math.floor((safePage - 1) / groupSize) * groupSize + 1;
+  const groupSlots = Array.from(
+    { length: Math.min(groupSize, pageCount - groupStart + 1) },
+    (_, i) => groupStart + i);
 
   const toggleReveal = (id: string) =>
     setRevealed(prev => {
@@ -129,126 +140,195 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack, onMusic, initialViewMode =
       return next;
     });
 
+  const modeBtn = CG_MEMORY.modeBtn;
+  const switchButtons = mode === 'cg'
+    ? [{ skin: CG_MEMORY.toScene, go: () => setMode('scenes'), idx: 0 },
+       { skin: CG_MEMORY.toSound, go: () => onMusic?.(), idx: 1 }]
+    : [{ skin: CG_MEMORY.toCg, go: () => setMode('cg'), idx: 0 },
+       { skin: CG_MEMORY.toSound, go: () => onMusic?.(), idx: 1 }];
+
   return (
-    <div className="extras-screen">
-      <div className="extras-head">
-        <div className="gallery-tabs">
+    <div className="cgmem">
+      <img className="cgmem-base" src={CG_MEMORY.base} alt="" draggable={false} />
+
+      {/* Title */}
+      <img
+        className="cgmem-title"
+        src={mode === 'cg' ? CG_MEMORY.titleCg : CG_MEMORY.titleScene}
+        style={pos(mode === 'cg' ? CG_MEMORY.titleRects.cg : CG_MEMORY.titleRects.scene)}
+        alt="" draggable={false}
+      />
+
+      {/* Mode switches */}
+      {switchButtons.map((b, i) => (
+        <button
+          key={i}
+          className="cgmem-modebtn"
+          style={{ left: modeBtn.x[b.idx], top: modeBtn.y, width: modeBtn.w, height: modeBtn.h }}
+          onClick={b.go}
+        >
+          <img src={b.skin.off} alt="" draggable={false} />
+          <img src={b.skin.over} alt="" draggable={false} className="hov" />
+        </button>
+      ))}
+
+      {/* Back */}
+      <button
+        className="cgmem-back"
+        style={pos(CG_MEMORY.backRect)}
+        onClick={onBack}
+        title={t('gallery.toTitle')}
+      >
+        <img src={CG_MEMORY.back.off} alt="" draggable={false} />
+        <img src={CG_MEMORY.back.over} alt="" draggable={false} className="hov" />
+      </button>
+
+      {/* All view toggle (no shipped bitmap; sits by the pager rule) */}
+      <button
+        className={`cgmem-all ${tab === 'all' ? 'on' : ''}`}
+        onClick={() => setTab('all')}
+      >{t('gallery.catAll')}</button>
+      <img
+        className="cgmem-rail"
+        src={CG_MEMORY.rail.normal}
+        style={pos(CG_MEMORY.rail.frame)}
+        alt="" draggable={false}
+      />
+      {GALLERY_SECTIONS.map((id, i) => {
+        const r = CG_MEMORY.rail.rows[i];
+        const disabled = mode === 'scenes' && (id === 'other' || !scenes.some(s => s.heroine === id));
+        const active = tab === id;
+        const c = countFor(id);
+        return (
           <button
-            className={viewMode === 'cg' ? 'on' : ''}
-            onClick={() => setViewMode('cg')}
-          >{t('gallery.tabCg')}</button>
-          <button
-            className={viewMode === 'scenes' ? 'on' : ''}
-            onClick={() => setViewMode('scenes')}
-          >{t('gallery.tabScenes')}</button>
-        </div>
-        <span className="extras-count">{curStats?.unlocked ?? 0} / {curStats?.total ?? 0}</span>
-        {onMusic && <button onClick={onMusic}>{t('music.title')}</button>}
-        <button onClick={onBack}>{t('gallery.toTitle')}</button>
-      </div>
+            key={id}
+            className={`cgmem-tab ${active ? 'on' : ''} ${disabled ? 'disabled' : ''}`}
+            style={{ left: r.x, top: r.y, width: r.w, height: r.h }}
+            disabled={disabled}
+            onClick={() => !disabled && setTab(id)}
+            title={t(`gallery.cat${id[0].toUpperCase()}${id.slice(1)}` as any)}
+          >
+            <span
+              className="cgmem-tab-crop over"
+              style={{
+                backgroundImage: `url(${CG_MEMORY.rail.over})`,
+                backgroundPositionY: -r.cropY,
+              } as React.CSSProperties}
+            />
+            <span
+              className="cgmem-tab-crop on"
+              style={{
+                backgroundImage: `url(${CG_MEMORY.rail.on})`,
+                backgroundPositionY: -r.cropY,
+              } as React.CSSProperties}
+            />
+            <span className="cgmem-tab-n">{c.unlocked}/{c.total}</span>
+          </button>
+        );
+      })}
 
-      {viewMode === 'cg' ? (<>
-        <div className="gallery-cats">
-          {(['all', ...CATEGORY_ORDER] as const).map(c => (
-            <button
-              key={c}
-              className={`gallery-cat ${category === c ? 'on' : ''}`}
-              onClick={() => setCategory(c)}
-            >
-              {t(CAT_KEY[c])}
-              <span className="gallery-cat-n">{stats[c]?.unlocked ?? 0}/{stats[c]?.total ?? 0}</span>
-            </button>
-          ))}
-        </div>
-
-        {pageCount > 1 && (
-          <div className="gallery-pages">
-            {Array.from({ length: pageCount }, (_, i) => i + 1).map(n => (
-              <button key={n} className={`gallery-page ${safePage === n ? 'on' : ''}`} onClick={() => setPage(n)}>{n}</button>
-            ))}
-          </div>
-        )}
-
-        <div className="gallery-grid gallery-paged">
-          {pageItems.map(g => {
-            const variants = unlockedVariants(g);
-            const isOpen = variants.length > 0;
+      {/* Grid */}
+      {mode === 'cg' ? (
+        <div className="cgmem-grid">
+          {CG_MEMORY.cg.origins.map((rect, i) => {
+            const tile = pageSlice[i] as CgTile | undefined;
+            if (!tile) return null;
+            const open = tileUnlocked(tile);
             return (
-              <div
-                key={g.id}
-                className={`gallery-cell ${isOpen ? '' : 'locked'}`}
-                onClick={() => openGroup(g)}
+              <button
+                key={tile.id}
+                className={`cgmem-cell ${open ? '' : 'locked'}`}
+                style={pos(rect)}
+                onClick={() => openTile(tile)}
               >
-                {isOpen
-                  ? <>
-                      <img src={variants[0].url} alt={g.id} loading="lazy" />
-                      {g.variants.length > 1 && (
-                        <span className="gallery-badge" title={t('gallery.variantsTitle', { n: g.variants.length })}>
-                          {g.variants.length}
-                        </span>
-                      )}
-                    </>
-                  : <div className="lock-mark">🔒</div>}
-              </div>
+                {open ? <>
+                  <img className="cgmem-frame" src={CG_MEMORY.cg.frameOff} alt="" draggable={false} />
+                  <img className="cgmem-frame hov" src={CG_MEMORY.cg.frameOver} alt="" draggable={false} />
+                  <img className="cgmem-thumb" src={tile.thumb}
+                    style={pos(CG_MEMORY.cg.thumb)} alt={tile.id} loading="lazy" draggable={false} />
+                  {tile.variants.length > 1 && (
+                    <span className="cgmem-badge" title={t('gallery.variantsTitle', { n: tile.variants.length })}>
+                      {tile.variants.length}
+                    </span>
+                  )}
+                </> : (
+                  <img className="cgmem-thumb" src={CG_MEMORY.cg.locked}
+                    style={pos(CG_MEMORY.cg.thumb)} alt="" draggable={false} />
+                )}
+              </button>
             );
           })}
         </div>
-      </>) : (<>
-        <div className="gallery-cats">
-          {(['all', ...SCENE_HEROINES] as const).map(h => (
-            <button
-              key={h}
-              className={`gallery-cat ${sceneHeroine === h ? 'on' : ''}`}
-              onClick={() => setSceneHeroine(h)}
-            >
-              {h === 'all' ? t('gallery.catAll') : t(CAT_KEY[h])}
-              <span className="gallery-cat-n">{sceneStats[h]?.unlocked ?? 0}/{sceneStats[h]?.total ?? 0}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="scene-grid">
-          {filteredScenes.map(sc => {
+      ) : (
+        <div className="cgmem-scenes">
+          {CG_MEMORY.scene.origins.map((rect, i) => {
+            const sc = pageSlice[i] as SceneEntry | undefined;
+            if (!sc) return null;
             const open = isSceneUnlocked(seen, sc);
             const isRevealed = revealed.has(sc.id);
             return (
-              <div key={sc.id} className={`scene-card ${open ? '' : 'locked'}`}>
-                <div
-                  className="scene-thumb"
-                  onClick={() => open && toggleReveal(sc.id)}
-                  title={open && !isRevealed ? t('gallery.reveal') : sc.storage}
-                >
-                  {open
-                    ? <>
-                        <img
-                          src={sc.thumb}
-                          alt={sc.orig}
-                          loading="lazy"
-                          className={isRevealed ? '' : 'blurred'}
-                        />
-                        {!isRevealed && <span className="scene-veil">🔞</span>}
-                      </>
-                    : <div className="lock-mark">🔒</div>}
-                </div>
-                <div className="scene-meta">
-                  <div className="scene-tags">
-                    <span className="scene-heroine">{t(CAT_KEY[sc.heroine] ?? 'gallery.catOther')}</span>
-                    <span className="scene-file">{sc.storage}</span>
-                  </div>
-                  <button
-                    className="scene-play"
-                    title={!open ? t('gallery.replayLocked') : undefined}
-                    onClick={() => onPlayScene?.(sc)}
-                  >
-                    ▶ {t('gallery.replay')}
-                  </button>
-                </div>
-              </div>
+              <button
+                key={sc.id}
+                className={`cgmem-cell cgmem-cell-scene ${open ? '' : 'locked'}`}
+                style={{ left: rect.x, top: rect.y, width: 250, height: 190 }}
+                onClick={() => onPlayScene?.(sc)}
+                title={open ? t('gallery.replay') : t('gallery.replayLocked')}
+              >
+                {open ? <>
+                  <img className="cgmem-frame" src={CG_MEMORY.scene.frameOff} alt="" draggable={false} />
+                  <img className="cgmem-frame hov" src={CG_MEMORY.scene.frameOver} alt="" draggable={false} />
+                  <img
+                    className={`cgmem-thumb ${isRevealed ? '' : 'blurred'}`}
+                    src={sc.thumb}
+                    style={pos(CG_MEMORY.scene.thumb)}
+                    alt={sc.orig} loading="lazy" draggable={false}
+                  />
+                  {!isRevealed && (
+                    <span
+                      className="cgmem-veil"
+                      title={t('gallery.reveal')}
+                      onClick={e => { e.stopPropagation(); toggleReveal(sc.id); }}
+                    >🔞</span>
+                  )}
+                </> : (
+                  <img className="cgmem-thumb" src={CG_MEMORY.scene.locked}
+                    style={pos(CG_MEMORY.scene.thumb)} alt="" draggable={false} />
+                )}
+              </button>
             );
           })}
         </div>
-      </>)}
+      )}
 
+      {/* Pager (four engine slots per group, arrows when the list spans groups) */}
+      {pageCount > 1 && (
+        <div className="cgmem-pager" style={{ left: CG_MEMORY.pager.x, top: CG_MEMORY.pager.y }}>
+          {groupStart > 1 && (
+            <button className="cgmem-page-step" style={{ left: -22 }}
+              onClick={() => setPage(groupStart - 1)}>◀</button>
+          )}
+          {groupSlots.map(n => (
+            <button
+              key={n}
+              className={`cgmem-page ${safePage === n ? 'on' : ''}`}
+              style={{ left: (n - groupStart) * CG_MEMORY.pager.pitch, width: CG_MEMORY.pager.w, height: CG_MEMORY.pager.h }}
+              onClick={() => setPage(n)}
+            >
+              <span className="tri">▼</span>
+              <span className="num">{((n - 1) % groupSize) + 1}</span>
+            </button>
+          ))}
+          {groupStart + groupSize - 1 < pageCount && (
+            <button className="cgmem-page-step"
+              style={{ left: (groupSlots.length * CG_MEMORY.pager.pitch) }}
+              onClick={() => setPage(groupStart + groupSize)}>▶</button>
+          )}
+        </div>
+      )}
+
+      <span className="cgmem-count">{currentCount.unlocked} / {currentCount.total}</span>
+
+      {/* Fullscreen variant viewer */}
       {viewer && cur && (
         <div className="cg-viewer" onClick={() => stepViewer(1)}>
           <button
@@ -261,7 +341,12 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack, onMusic, initialViewMode =
           {viewer.idx < viewer.variants.length - 1 && (
             <button className="cg-viewer-nav next" onClick={e => { e.stopPropagation(); stepViewer(1); }}>›</button>
           )}
-          <img className="cg-zoom" src={cur.url} alt={cur.stem} onClick={e => e.stopPropagation()} draggable={false} />
+          <div className="cg-viewer-stage" onClick={e => e.stopPropagation()}>
+            <img className="cg-zoom" src={cur.url} alt={cur.stem} draggable={false} />
+            {cur.overlay && (
+              <img className="cg-zoom-overlay" src={overlayUrl(cur.overlay)} alt="" draggable={false} />
+            )}
+          </div>
           {viewer.variants.length > 1 && (
             <div className="cg-viewer-bar" onClick={e => e.stopPropagation()}>
               <button onClick={() => stepViewer(-1)} disabled={viewer.idx === 0}>{t('gallery.prev')}</button>
@@ -274,5 +359,10 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack, onMusic, initialViewMode =
     </div>
   );
 };
+
+/** All tiles across sections in shipped order. */
+function cgTilesBase(sections: CgSection[]): CgTile[] {
+  return sections.flatMap(s => s.tiles);
+}
 
 export default GalleryScreen;

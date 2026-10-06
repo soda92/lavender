@@ -193,6 +193,17 @@ func SetupRouter(devMode bool, dataDir string) *gin.Engine {
 		c.JSON(http.StatusOK, scenesIndex)
 	})
 
+	// CG gallery index (engine main/cglist.csv: sections, shipped
+	// thumbnails and ordered variant/stex frames).
+	var (
+		cgOnce     sync.Once
+		cgSections []CgSection
+	)
+	r.GET("/api/cglist", func(c *gin.Context) {
+		cgOnce.Do(func() { cgSections = loadCgList(dataDir) })
+		c.JSON(http.StatusOK, cgSections)
+	})
+
 	// BGM stem -> title map (engine main/soundlist.csv, Shift-JIS).
 	var (
 		soundOnce sync.Once

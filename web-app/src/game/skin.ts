@@ -201,6 +201,61 @@ export const MES_LAYOUT = {
   waitIcon: { x: 758, y: 547, w: 27, h: 21 },
 } as const;
 
+// ---------------------------------------------------------------------------
+// cgmemory.csv — CG / scene recollection album (800x600 stage).
+// ---------------------------------------------------------------------------
+
+const cgMem = (tail: string) => uipsd(`cgmemory@${tail}.png`);
+
+export const CG_MEMORY = {
+  base: cgMem('背景%base'),
+  titleScene: cgMem('シーン鑑賞%layer'),
+  titleCg: cgMem('画像鑑賞%layer'),
+  // mode-switch tiles (cream "» ... mode" strips), 141x23
+  toScene: { off: cgMem('シーン鑑賞へ%button;off'), over: cgMem('シーン鑑賞へ%button;over') },
+  toCg: { off: cgMem('画像鑑賞へ%button;off'), over: cgMem('画像鑑賞へ%button;over') },
+  toSound: { off: cgMem('音楽鑑賞へ%button;off'), over: cgMem('音楽鑑賞へ%button;over') },
+  // charcoal Back tile, 52x52
+  back: { off: cgMem('戻る%button;off'), over: cgMem('戻る%button;over') },
+  // face-tab rail: 6 rows of 207x58 at x18, y121 pitch 58
+  rail: {
+    normal: cgMem('chrtabs%cref;normal'),
+    on: cgMem('chrtabs%cref;on'),
+    over: cgMem('chrtabs%cref;over'),
+    frame: { x: 21, y: 124, w: 201, h: 342 },
+    rows: [0, 1, 2, 3, 4, 5].map(i => ({ x: 18, y: 121 + i * 58, w: 207, h: 58, cropY: i * 57 })),
+  },
+  // CG grid: 4x4 cards, 130x100 at (243,116) pitch 135/105
+  cg: {
+    frameOff: cgMem('データ%button;off'),
+    frameOver: cgMem('データ%button;over'),
+    locked: cgMem('データ%button;サムネ'),
+    perPage: 16,
+    origins: [0, 1, 2, 3].flatMap(row =>
+      [0, 1, 2, 3].map(col => ({ x: 243 + col * 135, y: 116 + row * 105, w: 130, h: 100 }))),
+    thumb: { x: 5, y: 4, w: 120, h: 90 },
+  },
+  // Scene grid: 2x2 cards, 250x190 at (250,123)/(521,123)/(250,334)/(521,334)
+  scene: {
+    frameOff: cgMem('mデータ%button;off'),
+    frameOver: cgMem('mデータ%button;over'),
+    locked: cgMem('mデータ%button;サムネ'),
+    perPage: 4,
+    origins: [
+      { x: 250, y: 123 }, { x: 521, y: 123 },
+      { x: 250, y: 334 }, { x: 521, y: 334 },
+    ],
+    thumb: { x: 5, y: 4, w: 240, h: 180 },
+  },
+  // title layers
+  titleRects: { scene: { x: 40, y: 32, w: 265, h: 60 }, cg: { x: 38, y: 31, w: 185, h: 61 } },
+  // mode tiles + back geometry
+  modeBtn: { x: [423, 573], y: 58, w: 141, h: 23 },
+  backRect: { x: 723, y: 30, w: 52, h: 52 },
+  // numeric pager row, 4 slots of 31x35 at (246,545) pitch 40
+  pager: { x: 246, y: 545, w: 31, h: 35, pitch: 40, groupSize: 4 },
+} as const;
+
 export const SYS_BAR_Y = 580;
 
 export const SYS_BUTTONS = [

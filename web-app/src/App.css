@@ -417,7 +417,6 @@ button.danger { border-color: #b4555f; background: #4d2830; }
 }
 
 /* thin dark scrollbars for in-stage scroll areas */
-.gallery-grid,
 .music-list,
 .side-body,
 .history-list,
@@ -426,13 +425,11 @@ button.danger { border-color: #b4555f; background: #4d2830; }
   scrollbar-width: thin;
   scrollbar-color: rgba(157, 123, 216, 0.5) transparent;
 }
-.gallery-grid::-webkit-scrollbar,
 .music-list::-webkit-scrollbar,
 .side-body::-webkit-scrollbar,
 .history-list::-webkit-scrollbar,
 .archives-list::-webkit-scrollbar,
 .navigator-preview::-webkit-scrollbar { width: 8px; height: 8px; }
-.gallery-grid::-webkit-scrollbar-thumb,
 .music-list::-webkit-scrollbar-thumb,
 .side-body::-webkit-scrollbar-thumb,
 .history-list::-webkit-scrollbar-thumb,
@@ -441,7 +438,6 @@ button.danger { border-color: #b4555f; background: #4d2830; }
   background: rgba(157, 123, 216, 0.5);
   border-radius: 4px;
 }
-.gallery-grid::-webkit-scrollbar-track,
 .music-list::-webkit-scrollbar-track,
 .side-body::-webkit-scrollbar-track,
 .history-list::-webkit-scrollbar-track,
@@ -462,118 +458,135 @@ button.danger { border-color: #b4555f; background: #4d2830; }
 .extras-count { opacity: 0.6; font-size: 13px; }
 .extras-head button { margin-left: auto; }
 
-/* CG / Scene view tabs */
-.gallery-tabs { display: inline-flex; gap: 2px; }
-.gallery-tabs button {
-  margin: 0;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.12);
-  color: var(--ink);
-  border-radius: 0;
-  padding: 5px 18px;
-  font-size: 13px;
-  letter-spacing: 2px;
-  cursor: var(--cur-over, pointer);
-  opacity: 0.7;
-}
-.gallery-tabs button:first-child { border-radius: 14px 0 0 14px; }
-.gallery-tabs button:last-child { border-radius: 0 14px 14px 0; }
-.gallery-tabs button:hover { background: rgba(157,123,216,0.25); opacity: 1; }
-.gallery-tabs button.on {
-  background: rgba(157,123,216,0.45);
-  border-color: var(--accent);
-  opacity: 1;
-}
-
-/* scene recollection cards */
-.scene-grid {
-  flex: 1;
-  overflow-y: auto;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-auto-rows: 104px;
-  gap: 10px;
-  align-content: start;
-  padding-right: 4px;
-}
-.scene-card {
-  display: flex;
-  gap: 10px;
-  padding: 8px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-left: 3px solid #d07fb0;
-  border-radius: 8px;
-  min-width: 0;
-}
-.scene-card.locked { border-left-color: rgba(255,255,255,0.15); opacity: 0.85; }
-.scene-thumb {
-  position: relative;
-  width: 140px;
-  flex: 0 0 140px;
-  height: 100%;
-  border-radius: 6px;
-  overflow: hidden;
-  background: #000;
-  cursor: var(--cur-over, pointer);
-}
-.scene-thumb img {
-  width: 100%; height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.scene-thumb img.blurred {
-  filter: blur(10px) brightness(0.6);
-  transform: scale(1.15);
-}
-.scene-veil {
+/* ---------- CG / scene recollection album (cgmemory.csv skin) ---------- */
+.cgmem {
   position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 20px;
-  background: rgba(0,0,0,0.25);
+  overflow: hidden;
+  user-select: none;
+  font-family: "Yu Mincho", "Hiragino Mincho ProN", "MS Mincho", serif;
+  color: #4a4458;
+}
+.cgmem-base { position: absolute; left: 0; top: 0; width: 800px; height: 600px; pointer-events: none; }
+.cgmem-title { position: absolute; pointer-events: none; }
+
+/* cream "» ... mode" tiles + charcoal Back tile (verbatim bitmaps) */
+.cgmem-modebtn, .cgmem-back {
+  position: absolute; padding: 0; margin: 0;
+  background: none; border: none;
+  cursor: pointer;
+}
+.cgmem-modebtn img, .cgmem-back img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
   pointer-events: none;
 }
-.scene-meta {
-  flex: 1; min-width: 0;
-  display: flex; flex-direction: column;
-  justify-content: space-between;
-  padding: 2px 0;
+.cgmem-modebtn img.hov, .cgmem-back img.hov { opacity: 0; }
+.cgmem-modebtn:hover img.hov, .cgmem-back:hover img.hov { opacity: 1; }
+
+/* "All" toggle beside the pager on the base sheet's bottom rule */
+.cgmem-all {
+  position: absolute; left: 178px; top: 550px;
+  width: 40px; height: 24px;
+  background: rgba(255,255,255,0.55);
+  border: 1px solid #c3b6dd;
+  color: #6a6180;
+  font-size: 10px; letter-spacing: 1px;
+  cursor: pointer;
 }
-.scene-tags { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.scene-heroine {
-  font-size: 10px; font-weight: 600;
-  padding: 1px 7px; border-radius: 4px;
-  background: rgba(208,127,176,0.18);
-  color: #e7a8cf;
-  border: 1px solid rgba(208,127,176,0.4);
-  white-space: nowrap;
+.cgmem-all:hover { background: #efe8fb; }
+.cgmem-all.on { background: #e7dcf7; border-color: #b3a1d4; color: #6f4fb0; }
+
+/* face-tab rail: the normal-state bitmap is the base; per-row crops of the
+   over/on sprites appear on hover / selection */
+.cgmem-rail { position: absolute; pointer-events: none; }
+.cgmem-tab {
+  position: absolute; padding: 0; margin: 0;
+  background: none; border: none;
+  cursor: pointer;
 }
-.scene-file {
-  font-size: 10px; opacity: 0.45;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.cgmem-tab.disabled { cursor: default; }
+.cgmem-tab-crop {
+  position: absolute; left: 3px; top: 0;
+  width: 201px; height: 57px;
+  background-repeat: no-repeat;
+  background-size: 201px 342px;
+  opacity: 0; pointer-events: none;
 }
-.scene-play {
-  align-self: flex-end;
-  margin: 0;
-  padding: 4px 14px;
-  font-size: 11px; font-weight: 600;
-  border: none; border-radius: 4px;
-  color: #fff;
-  background: linear-gradient(135deg, #d07fb0, #9d7bd8);
-  box-shadow: 0 2px 8px rgba(208,127,176,0.35);
-  cursor: var(--cur-over, pointer);
+.cgmem-tab:not(.disabled):not(.on):hover .cgmem-tab-crop.over { opacity: 1; }
+.cgmem-tab.on .cgmem-tab-crop.on { opacity: 1; }
+.cgmem-tab.disabled::after {
+  content: ""; position: absolute; left: 3px; top: 0;
+  width: 201px; height: 57px;
+  background: rgba(235,232,240,0.55);
 }
-.scene-play:hover { filter: brightness(1.1); }
-/* Locked scenes remain launchable (watching unlocks them), like the
-   reference gallery: muted button instead of a disabled one. */
-.scene-card.locked .scene-play {
-  background: rgba(255,255,255,0.1);
-  box-shadow: none;
-  color: rgba(255,255,255,0.55);
+.cgmem-tab-n {
+  position: absolute; right: 9px; bottom: 3px;
+  font-size: 9px; font-family: sans-serif;
+  color: #fff; text-shadow: 0 0 3px #000, 0 1px 2px #000;
+  pointer-events: none;
 }
-.scene-card.locked .scene-play:hover {
-  filter: none;
-  background: rgba(255,255,255,0.16);
+.cgmem-tab.disabled .cgmem-tab-n { display: none; }
+
+/* data cards: 130x100 (CG) / 250x190 (scene), frames verbatim */
+.cgmem-grid, .cgmem-scenes { position: absolute; inset: 0; pointer-events: none; }
+.cgmem-cell {
+  position: absolute; padding: 0; margin: 0;
+  background: none; border: none;
+  cursor: pointer;
+}
+.cgmem-cell.locked { cursor: default; }
+/* locked scene cards still launch the recollection (playing unlocks) */
+.cgmem-cell-scene, .cgmem-cell-scene.locked { cursor: pointer; }
+.cgmem-frame { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.cgmem-frame.hov { opacity: 0; }
+.cgmem-cell:not(.locked):hover .cgmem-frame.hov { opacity: 1; }
+.cgmem-thumb { position: absolute; pointer-events: none; }
+.cgmem-thumb.blurred { filter: blur(8px) brightness(0.7); transform: scale(1.12); }
+.cgmem-badge {
+  position: absolute; right: 4px; bottom: 4px;
+  min-width: 15px; height: 15px; line-height: 15px;
+  padding: 0 3px; font-size: 9px; font-family: sans-serif; text-align: center;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.88);
+  border: 1px solid #b3a1d4; color: #6f4fb0;
+  pointer-events: none;
+}
+.cgmem-veil {
+  position: absolute; right: 6px; top: 6px;
+  width: 26px; height: 26px; line-height: 26px;
+  font-size: 14px; text-align: center;
+  background: rgba(255,255,255,0.88);
+  border-radius: 13px;
+  cursor: pointer;
+}
+.cgmem-veil:hover { background: #fff; }
+
+/* numeric pager: serif numbers with the engine's triangle marker */
+.cgmem-pager { position: absolute; }
+.cgmem-page {
+  position: absolute; top: 0;
+  width: 31px; height: 35px;
+  padding: 0; background: none; border: none;
+  display: flex; flex-direction: column; align-items: center;
+  color: #5b5566; cursor: pointer;
+}
+.cgmem-page .tri { font-size: 7px; line-height: 9px; color: #5b5566; }
+.cgmem-page .num { font-size: 19px; line-height: 23px; }
+.cgmem-page:hover .num, .cgmem-page.on .num { color: #9d7bd8; }
+.cgmem-page.on .tri { color: #9d7bd8; }
+.cgmem-page-step {
+  position: absolute; top: 7px;
+  width: 16px; height: 24px;
+  padding: 0; background: none; border: none;
+  font-size: 10px; color: #8a8396; cursor: pointer;
+}
+.cgmem-page-step:hover { color: #9d7bd8; }
+
+/* quiet seen counter on the base sheet's bottom rule */
+.cgmem-count {
+  position: absolute; left: 700px; top: 549px;
+  font-size: 12px; color: #7d7789;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
 
 /* floating "end recollection" badge during scene replay */
@@ -588,111 +601,41 @@ button.danger { border-color: #b4555f; background: #4d2830; }
   background: linear-gradient(135deg, rgba(208,127,176,0.85), rgba(157,123,216,0.85));
   border: 1px solid rgba(255,255,255,0.3);
   border-radius: 14px;
-  cursor: var(--cur-over, pointer);
+  cursor: pointer;
   box-shadow: 0 2px 10px rgba(0,0,0,0.5);
 }
 .scene-exit:hover { filter: brightness(1.15); }
 
-.gallery-grid {
-  flex: 1;
-  overflow-y: auto;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  align-content: start;
-}
-/* Ratio box via padding-bottom: aspect-ratio alone does NOT feed grid
-   auto-row sizing here (overflow:hidden zeroes the item's automatic
-   minimum, collapsing every track to 2px). */
-.gallery-cell {
-  position: relative;
-  height: 0;
-  padding-bottom: 75%; /* 4:3, resolved against the column width */
-  background: #100c20;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-  overflow: hidden;
-  cursor: var(--cur-over, pointer);
-}
-.gallery-cell img {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%; object-fit: cover; display: block;
-}
-.gallery-cell.locked { cursor: var(--cur-normal, default); }
-.lock-mark {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 30px; opacity: 0.35;
-}
-
-/* category chips + pagination */
-.gallery-cats {
-  display: flex; flex-wrap: wrap; gap: 6px;
-  margin-bottom: 10px;
-}
-.gallery-cat {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
-  color: var(--ink);
-  border-radius: 12px;
-  padding: 3px 11px;
-  font-size: 11px;
-  cursor: var(--cur-over, pointer);
-}
-.gallery-cat:hover { background: rgba(157,123,216,0.2); }
-.gallery-cat.on {
-  background: rgba(157,123,216,0.4);
-  border-color: var(--accent);
-}
-.gallery-cat-n { font-size: 10px; opacity: 0.65; }
-.gallery-pages {
-  display: flex; flex-wrap: wrap; gap: 4px;
-  justify-content: center;
-  margin-bottom: 8px;
-}
-.gallery-page {
-  min-width: 24px;
-  padding: 2px 7px;
-  font-size: 11px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
-  color: var(--ink);
-  border-radius: 4px;
-  cursor: var(--cur-over, pointer);
-}
-.gallery-page.on { background: rgba(157,123,216,0.5); border-color: var(--accent); }
-.gallery-grid.gallery-paged { flex: none; overflow: visible; }
-.gallery-badge {
-  position: absolute;
-  right: 3px; bottom: 3px;
-  min-width: 16px; padding: 0 4px;
-  font-size: 10px; line-height: 16px; text-align: center;
-  border-radius: 8px;
-  background: rgba(30, 20, 55, 0.85);
-  border: 1px solid rgba(157,123,216,0.7);
-  color: #d9ccf5;
-  pointer-events: none;
-}
-
-/* fullscreen variant viewer */
+/* fullscreen variant viewer (cgmode.tjs semantics: click = next frame,
+   click past the end returns to the grid) */
 .cg-viewer {
-  position: absolute; inset: 0; z-index: 50;
-  background: rgba(0,0,0,0.94);
-  display: flex; align-items: center; justify-content: center;
-  cursor: var(--cur-over, pointer);
+  position: absolute; inset: 0; z-index: 60;
+  background: rgba(15,10,25,0.93);
+  cursor: pointer;
   user-select: none;
 }
+.cg-viewer-stage {
+  position: absolute; left: 0; top: 0;
+  width: 800px; height: 600px;
+  overflow: hidden;
+}
 .cg-viewer .cg-zoom {
-  max-width: 92%; max-height: 88%;
-  border: 2px solid var(--accent);
-  cursor: var(--cur-normal, default);
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: contain;
+  cursor: default;
+}
+.cg-viewer .cg-zoom-overlay {
+  position: absolute; left: 50%; bottom: 0;
+  transform: translateX(-50%);
+  max-width: none;
+  pointer-events: none;
 }
 .cg-viewer-x {
   position: absolute; top: 10px; right: 14px;
   background: none; border: none;
   color: var(--ink); font-size: 26px; line-height: 1;
-  cursor: var(--cur-over, pointer); opacity: 0.7;
+  cursor: pointer; opacity: 0.7;
 }
 .cg-viewer-x:hover { opacity: 1; }
 .cg-viewer-nav {
@@ -701,7 +644,7 @@ button.danger { border-color: #b4555f; background: #4d2830; }
   border: 1px solid rgba(255,255,255,0.2);
   color: var(--ink); font-size: 34px;
   width: 42px; height: 64px;
-  cursor: var(--cur-over, pointer); opacity: 0.75;
+  cursor: pointer; opacity: 0.75;
 }
 .cg-viewer-nav:hover { opacity: 1; background: rgba(70,50,110,0.8); }
 .cg-viewer-nav.prev { left: 8px; }
@@ -715,14 +658,14 @@ button.danger { border-color: #b4555f; background: #4d2830; }
   border-radius: 18px;
   padding: 5px 16px;
   font-size: 12px;
-  cursor: var(--cur-normal, default);
+  cursor: default;
 }
 .cg-viewer-bar button {
   background: none; border: 1px solid rgba(255,255,255,0.25);
   color: var(--ink); border-radius: 12px;
-  padding: 2px 12px; font-size: 11px; cursor: var(--cur-over, pointer);
+  padding: 2px 12px; font-size: 11px; cursor: pointer;
 }
-.cg-viewer-bar button:disabled { opacity: 0.35; cursor: var(--cur-normal, default); }
+.cg-viewer-bar button:disabled { opacity: 0.35; cursor: default; }
 .cg-viewer-bar button:not(:disabled):hover { background: rgba(157,123,216,0.35); }
 
 .music-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding-right: 6px; }

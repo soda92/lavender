@@ -1,25 +1,63 @@
 /**
- * Event CG grouping. The shipped evimage assets store one gallery CG as
- * multiple files: numbered letter variants (ev_akina_02a/02b/02c — the
- * expression/pose differences inside one still). Each variant also ships an
- * "_l" framing, but it is pixel-identical content, so those files are ignored
- * here (they only survive as unlock aliases in the gallery). The G-senjou
- * reference gallery folds all variants of one CG under a single tile and lets
- * the viewer page through them; these helpers derive the same grouping
- * automatically from the filename conventions.
+ * Event CG gallery model.
+ *
+ * Canonical data comes from /api/cglist, which mirrors the engine's
+ * main/cglist.csv: per-heroine sections, shipped /thum thumbnails and the
+ * ordered variant sequence for each tile (including ev_stex + fgimage
+ * overlay frames). The filename-derived grouping below only remains as an
+ * offline fallback for when the index is unavailable.
  */
 
 export interface CgVariant {
+  /** Event-CG stem, served from /evimage. */
   stem: string;
+  /** Foreground face-layer stem (served from /fgimage/面付), if any. */
+  overlay?: string;
+  /** Full image URL (derived). */
   url: string;
 }
 
-export interface CgGroup {
-  /** Shared base stem, e.g. ev_akina_02 covers 02a/02b/02c(_l). */
+export interface CgTile {
+  /** Thumbnail stem, unique within the gallery. */
   id: string;
-  category: string;
+  /** Shipped thumbnail URL under /thum. */
+  thumb: string;
   variants: CgVariant[];
 }
+
+export interface CgSection {
+  /** Heroine token or "other"; "" only possible in malformed data. */
+  id: string;
+  tiles: CgTile[];
+}
+
+/** Section / face-rail order as shipped in cglist.csv. */
+export const GALLERY_SECTIONS = ['hikaru', 'haruka', 'reika', 'riko', 'akina', 'other'] as const;
+
+export const evImageUrl = (stem: string) => `/evimage/${stem}.png`;
+export const overlayUrl = (stem: string) =>
+  `/fgimage/${encodeURIComponent('面付')}/${stem}.png`;
+
+/** Normalizes the server /api/cglist payload with derived URLs. */
+export function normalizeSections(data: any[]): CgSection[] {
+  if (!Array.isArray(data)) return [];
+  return data.map((s: any) => ({
+    id: String(s.id ?? ''),
+    tiles: (Array.isArray(s.tiles) ? s.tiles : []).map((t: any) => ({
+      id: String(t.id ?? ''),
+      thumb: String(t.thumb ?? ''),
+      variants: (Array.isArray(t.variants) ? t.variants : []).map((v: any) => ({
+        stem: String(v.stem ?? ''),
+        ...(v.overlay ? { overlay: String(v.overlay) } : {}),
+        url: evImageUrl(String(v.stem ?? '')),
+      })),
+    })),
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Fallback grouping from a raw /api/media?dir=evimage listing.
+// ---------------------------------------------------------------------------
 
 const HEROINES = new Set(['akina', 'haruka', 'hikaru', 'reika', 'riko']);
 
@@ -52,8 +90,9 @@ export function categoryOf(stem: string): string {
   return HEROINES.has(tok) ? tok : 'other';
 }
 
-export function buildCgGroups(urls: string[]): CgGroup[] {
-  const map = new Map<string, CgGroup>();
+/** Heuristic variant grouping (fallback only). */
+export function buildCgGroups(urls: string[]): CgTile[] {
+  const map = new Map<string, CgTile>();
   for (const url of urls) {
     const stem = decodeURIComponent(url.split('/').pop() ?? '').replace(/\.[^.]+$/, '');
     // The _l framing is the same image as its partner; never its own tile.
@@ -61,7 +100,7 @@ export function buildCgGroups(urls: string[]): CgGroup[] {
     const id = cgGroupKey(stem);
     let g = map.get(id);
     if (!g) {
-      g = { id, category: categoryOf(id), variants: [] };
+      g = { id, thumb: evImageUrl(stem), variants: [] };
       map.set(id, g);
     }
     g.variants.push({ stem, url });
@@ -70,4 +109,18 @@ export function buildCgGroups(urls: string[]): CgGroup[] {
     g.variants.sort((a, b) => naturalCompare(a.stem, b.stem));
   }
   return [...map.values()].sort((a, b) => naturalCompare(a.id, b.id));
+}
+
+/** Buckets heuristic tiles into the shipped section order (fallback only). */
+export function buildFallbackSections(urls: string[]): CgSection[] {
+  const tiles = buildCgGroups(urls);
+  const buckets = new Map<string, CgTile[]>();
+  for (const id of GALLERY_SECTIONS) buckets.set(id, []);
+  for (const tile of tiles) {
+    const cat = categoryOf(tile.id);
+    buckets.get(cat)?.push(tile);
+  }
+  return GALLERY_SECTIONS
+    .map(id => ({ id, tiles: buckets.get(id) ?? [] }))
+    .filter(s => s.tiles.length > 0);
 }

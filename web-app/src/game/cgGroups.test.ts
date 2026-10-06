@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { buildCgGroups, cgGroupKey, naturalCompare, categoryOf } from './cgGroups';
+import {
+  buildCgGroups, buildFallbackSections, cgGroupKey, naturalCompare,
+  categoryOf, normalizeSections,
+} from './cgGroups';
 
 describe('cgGroupKey', () => {
   it('strips trailing letter runs and the _l framing', () => {
@@ -54,6 +57,34 @@ describe('buildCgGroups', () => {
     expect(g.variants.map(v => v.stem)).toEqual([
       'ev_hikaru_03aa', 'ev_hikaru_03ab', 'ev_hikaru_03ba', 'ev_hikaru_03bb',
     ]);
-    expect(g.category).toBe('hikaru');
+  });
+});
+
+describe('normalizeSections', () => {
+  it('derives variant URLs and preserves stex overlays', () => {
+    const [s] = normalizeSections([{
+      id: 'hikaru',
+      tiles: [{
+        id: 'thumb_stex_hikaru_a',
+        thumb: '/thum/thumb_stex_hikaru_a.png',
+        variants: [
+          { stem: 'ev_stex_hikaru_a', overlay: 'st_ex_hikaru_a' },
+          { stem: 'ev_hikaru_01' },
+        ],
+      }],
+    }]);
+    expect(s.tiles[0].variants[0].url).toBe('/evimage/ev_stex_hikaru_a.png');
+    expect(s.tiles[0].variants[0].overlay).toContain('st_ex_hikaru_a');
+    expect(s.tiles[0].variants[1].overlay).toBeUndefined();
+  });
+});
+
+describe('buildFallbackSections', () => {
+  it('buckets tiles in shipped section order and drops empties', () => {
+    const sections = buildFallbackSections([
+      '/evimage/ev_hikaru_01a.png', '/evimage/ev_akina_02.png',
+    ]);
+    expect(sections.map(s => s.id)).toEqual(['hikaru', 'akina']);
+    expect(sections[0].tiles[0].thumb).toBe('/evimage/ev_hikaru_01a.png');
   });
 });
