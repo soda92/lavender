@@ -218,7 +218,7 @@ export default function App() {
 
       </div>
 
-      {/* Unified docked panel: backlog / flipper / archives / settings. */}
+      {/* Unified docked panel: backlog / navigator / archives / settings. */}
       {runner.sideTab && (
         <SidePanel
           tab={runner.sideTab as SideTab}

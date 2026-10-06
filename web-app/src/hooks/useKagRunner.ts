@@ -225,7 +225,7 @@ export function useKagRunner(audio: {
   const [currentScenario, setCurrentScenario] = useState('start');
   const [pointer, setPointer] = useState(0);
   const [stage, setStage] = useState<StageState>(structuredClone(EMPTY_STAGE));
-  // True while a flipper seek silently rebuilds the scene: char fades are
+  // True while a navigator seek silently rebuilds the scene: char fades are
   // suppressed so the scrubbed scene doesn't trail ghosts.
   const [isSeeking, setIsSeeking] = useState(false);
   const [stageTransition, setStageTransition] = useState<{
@@ -339,7 +339,7 @@ export function useKagRunner(audio: {
   const lastCommittedRef = useRef<StageState>(structuredClone(EMPTY_STAGE));
   const transitionTimerRef = useRef<any>(null);
   const transKeyRef = useRef(0);
-  // Page-flipper / deep-link seek: silently replay commands from the file
+  // Page-navigator / deep-link seek: silently replay commands from the file
   // start up to this pointer, rebuilding the stage without audio or waits.
   const seekRef = useRef<number | null>(null);
   const silentRef = useRef(false);
@@ -631,7 +631,7 @@ export function useKagRunner(audio: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Page-flipper seek inside the currently loaded scenario.
+  // Page-navigator seek inside the currently loaded scenario.
   const seekToPointer = useCallback((target: number) => {
     const data = dataRef.current;
     if (!data) return;

@@ -16,7 +16,7 @@ const stripName = (raw: string): {speaker: string; text: string} => {
   return {speaker: i >= 0 ? name.slice(i + 1) : name, text: m[2]};
 };
 
-const FlipperTab: React.FC<Props> = ({instructions, pointer, scenario, onSeek}) => {
+const NavigatorTab: React.FC<Props> = ({instructions, pointer, scenario, onSeek}) => {
   const t = useT();
   const max = Math.max(0, instructions.length - 1);
   const [target, setTarget] = useState(Math.min(pointer, max));
@@ -53,10 +53,10 @@ const FlipperTab: React.FC<Props> = ({instructions, pointer, scenario, onSeek}) 
 
   return (
     <div className="side-body">
-      <div className="flipper-scenario-row">
-        <span className="flipper-scenario">{scenario.split('/').pop()}</span>
+      <div className="navigator-scenario-row">
+        <span className="navigator-scenario">{scenario.split('/').pop()}</span>
       </div>
-        <div className="flipper-position">
+        <div className="navigator-position">
           <input
             type="number"
             min={0}
@@ -66,11 +66,11 @@ const FlipperTab: React.FC<Props> = ({instructions, pointer, scenario, onSeek}) 
             onKeyDown={e => { if (e.key === 'Enter') jump(); }}
           />
           <span>/ {max}</span>
-          <button className="flipper-jump" onClick={jump}>{t('flipper.jump')}</button>
+          <button className="navigator-jump" onClick={jump}>{t('navigator.jump')}</button>
         </div>
 
         <input
-          className="flipper-range"
+          className="navigator-range"
           type="range"
           min={0}
           max={max}
@@ -78,7 +78,7 @@ const FlipperTab: React.FC<Props> = ({instructions, pointer, scenario, onSeek}) 
           onChange={e => setTarget(parseInt(e.target.value, 10))}
         />
 
-        <div className="flipper-steps">
+        <div className="navigator-steps">
           <button onClick={() => step(-100)}>-100</button>
           <button onClick={() => step(-10)}>-10</button>
           <button onClick={() => step(-1)}>-1</button>
@@ -87,30 +87,30 @@ const FlipperTab: React.FC<Props> = ({instructions, pointer, scenario, onSeek}) 
           <button onClick={() => step(100)}>+100</button>
         </div>
 
-        <div className="flipper-preview">
+        <div className="navigator-preview">
           {preview.map(r => (
             <div
               key={r.index}
-              className={`flipper-line ${r.index === textRows[anchorIdx]?.index ? 'cur' : ''}`}
+              className={`navigator-line ${r.index === textRows[anchorIdx]?.index ? 'cur' : ''}`}
               role="button"
               tabIndex={0}
-              title={t('flipper.jump')}
+              title={t('navigator.jump')}
               onClick={() => go(r.index)}
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') go(r.index); }}
             >
-              <span className="flipper-ptr">{r.index}</span>
+              <span className="navigator-ptr">{r.index}</span>
               {r.speaker && <b>{r.speaker}　</b>}
               <span>{r.text}</span>
             </div>
           ))}
-          {preview.length === 0 && <div className="archives-empty">{t('flipper.empty')}</div>}
+          {preview.length === 0 && <div className="archives-empty">{t('navigator.empty')}</div>}
         </div>
 
-      <div className="flipper-hint">
-        {t('flipper.hint')}
+      <div className="navigator-hint">
+        {t('navigator.hint')}
       </div>
     </div>
   );
 };
 
-export default FlipperTab;
+export default NavigatorTab;

@@ -1,14 +1,14 @@
 import React, { type CSSProperties } from 'react';
 import HistoryTab from './HistoryModal';
-import FlipperTab from './PageFlipper';
+import NavigatorTab from './PageNavigator';
 import ArchivesTab from './ArchivesModal';
 import { useT, type TKey } from '../game/i18n';
 
-export type SideTab = 'history' | 'flipper' | 'archives';
+export type SideTab = 'history' | 'navigator' | 'archives';
 
 const TABS: Array<{ id: SideTab; labelKey: TKey; playingOnly?: boolean }> = [
   { id: 'history', labelKey: 'tab.history', playingOnly: true },
-  { id: 'flipper', labelKey: 'tab.flipper', playingOnly: true },
+  { id: 'navigator', labelKey: 'tab.navigator', playingOnly: true },
   { id: 'archives', labelKey: 'tab.archives' },
 ];
 
@@ -22,7 +22,7 @@ interface Props {
 }
 
 /**
- * The single docked side panel. Hosts the backlog, page flipper, document
+ * The single docked side panel. Hosts the backlog, page navigator, document
  * archives and settings as tabs. Mounted outside the scaled stage frame so
  * it lives in the viewport letterbox, never over the game.
  */
@@ -48,8 +48,8 @@ const SidePanel: React.FC<Props> = ({ tab, playing, dockStyle, runner, onTab, on
       {tab === 'history' && (
         <HistoryTab items={runner.historyLog} onReplayVoice={runner.replayVoice} />
       )}
-      {tab === 'flipper' && playing && (
-        <FlipperTab
+      {tab === 'navigator' && playing && (
+        <NavigatorTab
           instructions={runner.scenarioInstructions}
           pointer={runner.pointer}
           scenario={runner.currentScenario}

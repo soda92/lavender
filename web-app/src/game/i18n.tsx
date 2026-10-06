@@ -23,7 +23,7 @@ const dict = {
   'title.music': { ja: '音楽鑑賞', en: 'Music Room' },
 
   'tab.history': { ja: '履歴', en: 'Backlog' },
-  'tab.flipper': { ja: 'ページ', en: 'Jump' },
+  'tab.navigator': { ja: 'ページ', en: 'Navigator' },
   'tab.archives': { ja: '文書', en: 'Saves' },
   'tab.settings': { ja: '設定', en: 'Settings' },
 
@@ -61,9 +61,9 @@ const dict = {
 
   'history.empty': { ja: '履歴はありません', en: 'No backlog yet' },
 
-  'flipper.jump': { ja: 'ここへ移動', en: 'Move Here' },
-  'flipper.empty': { ja: 'この付近に台詞はありません', en: 'No dialogue near here' },
-  'flipper.hint': {
+  'navigator.jump': { ja: 'ここへ移動', en: 'Move Here' },
+  'navigator.empty': { ja: 'この付近に台詞はありません', en: 'No dialogue near here' },
+  'navigator.hint': {
     ja: 'Enterキー・±ボタン・台詞クリックでその位置へ移動。移動すると、シナリオ先頭からその位置までを自動再生して場面を復元します（音声・動画は省略）。',
     en: 'Press Enter, use a ± button, or click a line to jump. Seeking silently replays the scenario from the start to this point to restore the scene (voice and video are skipped).',
   },
