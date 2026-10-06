@@ -2,6 +2,8 @@
 // extraction pipeline and provides resolution helpers for backgrounds,
 // media, and the layered character sprite system.
 
+import { resolveStand } from './standResolve';
+
 export interface SpriteLayer {
   name: string;
   left: number;
@@ -466,9 +468,21 @@ export function renderCharacter(
   const ci = m.charmeta.characters[reg];
   if (!ci || ci.poses.length === 0) return null;
 
-  const poseRef =
-    ci.poses.find(p => p.pose === spec.pose) ||
-    ci.poses[0];
+  // exstand.tjs setDiff/setFace: a diff or face the current pose doesn't
+  // declare switches the WHOLE stand (body included) to the first pose that
+  // does. Borrowing a face plate from another pose is wrong: per-pose sheets
+  // have their own coordinates and a transparent face hole.
+  const resolved = resolveStand(
+    ci.poses.map(p => ({
+      pose: p.pose,
+      base: p.base,
+      dresses: m.charmeta.poses[p.base]?.dresses ?? [],
+      faces: m.charmeta.poses[p.base]?.faces ?? [],
+    })),
+    spec,
+  );
+  const poseRef = ci.poses[resolved.index] || ci.poses[0];
+  const faceExpr = resolved.face;
   const level = spec.level ?? m.envinit.defaultLevel ?? 1;
   let meta = m.charmeta.poses[poseRef.base];
   if (!meta) return null;
@@ -505,36 +519,17 @@ export function renderCharacter(
     }
   }
 
-  // face: expression code within the base layer's costume group.
+  // face: expression code within the base layer's costume group. The
+  // effective expression (faceExpr) already follows engine stand switching
+  // and checkDiffFace defaulting; every remaining miss is a real manifest
+  // gap, so leave the body's face hole empty rather than painting a plate
+  // from another pose's coordinates.
   let face: RenderedSpritePart | null = null;
-  if (spec.face && baseRow) {
-    const faceCode = meta.faces.find(f => f.expression === spec.face)?.layer;
-    let faceRow = faceCode ? layers.find(l => l.name === faceCode && l.group_id === baseRow.group_id) : null;
-    let faceBase = poseRef.base;
-    // Cross-pose fallback is valid only for the shared full-stand frames of
-    // levels 1/2. Level-0 pages are per-pose authored bust crops whose face
-    // plates use incompatible coordinates; a missing expression there means
-    // body-only, exactly like the engine's per-stand getFaceInfo().
-    if (!faceRow && level !== 0) {
-      // cross-pose fallback
-      for (const other of ci.poses) {
-        if (other.base === poseRef.base) continue;
-        const om = m.charmeta.poses[other.base];
-        if (!om) continue;
-        const code = om.faces.find(f => f.expression === spec.face)?.layer;
-        if (!code) continue;
-        const ol = om.levels[levelKey] || om.levels['1'];
-        const oBase = ol.find(l => l.name === om.dresses[0]?.layer || l.name === baseName(om.dresses[0]?.layer || ''));
-        const cand = ol.find(l => l.name === code && (!oBase || l.group_id === oBase.group_id));
-        if (cand) {
-          faceRow = cand;
-          faceBase = other.base;
-          break;
-        }
-      }
-    }
+  if (faceExpr && baseRow) {
+    const faceCode = meta.faces.find(f => f.expression === faceExpr)?.layer;
+    const faceRow = faceCode ? layers.find(l => l.name === faceCode && l.group_id === baseRow.group_id) : null;
     if (faceRow) {
-      const url = mediaUrl(`${faceBase}_${level}_${faceRow.layer_id}`);
+      const url = mediaUrl(`${poseRef.base}_${level}_${faceRow.layer_id}`);
       if (url) face = part(url, faceRow);
     }
   }

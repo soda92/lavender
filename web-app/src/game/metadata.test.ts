@@ -114,26 +114,29 @@ describe('renderCharacter — level-0 miniface (顔領域 bust page)', () => {
     expect(r.body).toMatchObject({ x: 0, y: 0 });
   });
 
-  it('renders body-only when the expression has no plate on this pose level 0', () => {
-    // すねる exists only on pose B; level-0 frames are per-pose, so no
-    // cross-pose plate may be transplanted (engine getFaceInfo is per-stand).
+  it('a face missing on the pose switches the WHOLE stand (engine setFace)', () => {
+    // すねる is declared only on ポーズＢ. exstand setFace switches pose to
+    // the first stand with that face for the dress — body AND face come from
+    // Ｂ, at every level; a plate is never transplanted across poses.
     const r = reikaBougu('すねる');
-    expect(r.facePage!.face).toBeNull();
-    expect(r.face).toBeNull();
-    expect(r.facePage!.body!.url).toContain('reika_c_0_38');
+    expect(r.facePage!.face).not.toBeNull();
+    expect(r.facePage!.face!.url).toContain('reika_b_0_79');
+    expect(r.facePage!.body!.url).toContain('reika_b_0_65'); // Base(bougu) of B
+    expect(r.body!.url).toContain('reika_b_0_65');
     // 怒り ('02') does ship a pose-C level-0 plate and must use it in-place.
     const ikari = reikaBougu('怒り');
     expect(ikari.facePage!.face!.url).toContain('reika_c_0_40');
     expect(ikari.facePage!.face).toMatchObject({ x: 47, y: 84, w: 74, h: 65 });
   });
 
-  it('still allows cross-pose face fallback on the shared level-1 frames', () => {
+  it('stand switching applies identically to the shared level-1 frames', () => {
     const r = renderCharacter('レイカ', {
       pose: 'ポーズＣ', dress: '防具', diff: '基本', face: 'すねる', level: 1,
     })!;
     expect(r.facePage).toBeUndefined();
-    expect(r.face).not.toBeNull();
-    expect(r.face!.url).toContain('reika_b_1_');
+    // Entire stand is ポーズＢ, not a B face plate grafted onto a C body.
+    expect(r.face!.url).toContain('reika_b_1_79');
+    expect(r.body!.url).toContain('reika_b_1_65');
   });
 });
 
