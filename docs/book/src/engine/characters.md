@@ -75,6 +75,25 @@ authentic `顔mask%layer.png`. It is independent of the message-window skin:
 the bust renders in both the normal `message01` window and the modern
 immerse-mode pill, at the same stage coordinates (left 0, window top 399).
 
+The level-0 page is its **own authored 205×200 bust canvas** — not a trim of
+the on-stage page (`envinit.tjs`: `faceLevelName = 0`; `exstand.tjs`
+`drawFace` → `getStandLayer(pose, 0)` → `getFaceArea`). Body and expression
+plate are composited on that full, untrimmed canvas at their raw manifest
+coordinates and the marker rect indexes it 1:1. Two consequences:
+
+- Per-pose face coordinates differ, so the cross-pose expression fallback
+  used on the shared full-stand frames (levels 1/2) is **invalid at level 0**;
+  `exstand setFace`/`getFaceInfo` are per-stand anyway. When a pose ships no
+  plate for the requested expression (e.g. レイカ ポーズＣ 防具 only ships
+  01–04/17–20; `すねる` is pose-B-only), the bust paints **body only**, and
+  the body's transparent face hole lets the message01 `フレーム%layer.png`
+  decorative tile panel show through — exactly the engine result.
+- The on-stage union-bounds trim (page `x/y`) must never be applied to the
+  bust source; doing so shifts every bust crop up-left by the trim origin.
+
+`RenderedSprite.facePage` carries the untrimmed descriptor
+(`w/h`, raw `body`/`face`, marker `rect`); `paintSpriteFace` consumes it.
+
 ## Transitions
 
 Pose/dress/diff/face **changes cut instantly**. Enter/exit (show/hide) honor

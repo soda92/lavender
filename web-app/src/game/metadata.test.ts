@@ -87,6 +87,56 @@ describe('renderCharacter — level sheets', () => {
   });
 });
 
+describe('renderCharacter — level-0 miniface (顔領域 bust page)', () => {
+  // lave34/621: レイカ is FACE-displayed in 防具 / ポーズＣ. Each pose authors
+  // its own 205×200 level-0 bust canvas; parts keep RAW layer coords and the
+  // 顔領域 marker indexes that full (untrimmed) page directly.
+  const reikaBougu = (face: string) =>
+    renderCharacter('レイカ', {
+      pose: 'ポーズＣ', dress: '防具', diff: '基本', face, level: 0,
+    })!;
+
+  it('exposes a full untrimmed 205×200 facePage with raw layer coords', () => {
+    const r = reikaBougu('喜び'); // the only plate shipped on pose C level 0
+    expect(r.facePage).toBeDefined();
+    expect(r.facePage!.w).toBe(205);
+    expect(r.facePage!.h).toBe(200);
+    expect(r.facePage!.rect).toEqual({ left: 0, top: 0, width: 205, height: 200 });
+    // Base(bougu) sits at raw (0,21) on the authored page.
+    expect(r.facePage!.body).toMatchObject({ x: 0, y: 21, w: 176, h: 179 });
+    expect(r.facePage!.body!.url).toContain('reika_c_0_38');
+    // Expression plate '01' at its raw pose-C coordinates.
+    expect(r.facePage!.face).toMatchObject({ x: 47, y: 84, w: 74, h: 65 });
+    expect(r.facePage!.face!.url).toContain('reika_c_0_39');
+    // The on-stage trim still starts at y=21, proving the two coordinate
+    // frames must not be mixed (this shift used to corrupt the bust crop).
+    expect(r.page).toMatchObject({ x: 0, y: 21 });
+    expect(r.body).toMatchObject({ x: 0, y: 0 });
+  });
+
+  it('renders body-only when the expression has no plate on this pose level 0', () => {
+    // すねる exists only on pose B; level-0 frames are per-pose, so no
+    // cross-pose plate may be transplanted (engine getFaceInfo is per-stand).
+    const r = reikaBougu('すねる');
+    expect(r.facePage!.face).toBeNull();
+    expect(r.face).toBeNull();
+    expect(r.facePage!.body!.url).toContain('reika_c_0_38');
+    // 怒り ('02') does ship a pose-C level-0 plate and must use it in-place.
+    const ikari = reikaBougu('怒り');
+    expect(ikari.facePage!.face!.url).toContain('reika_c_0_40');
+    expect(ikari.facePage!.face).toMatchObject({ x: 47, y: 84, w: 74, h: 65 });
+  });
+
+  it('still allows cross-pose face fallback on the shared level-1 frames', () => {
+    const r = renderCharacter('レイカ', {
+      pose: 'ポーズＣ', dress: '防具', diff: '基本', face: 'すねる', level: 1,
+    })!;
+    expect(r.facePage).toBeUndefined();
+    expect(r.face).not.toBeNull();
+    expect(r.face!.url).toContain('reika_b_1_');
+  });
+});
+
 describe('findLabelIndex', () => {
   const instructions = [
     { type: 'command', name: 'initscene' },

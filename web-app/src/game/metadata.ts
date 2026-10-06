@@ -425,6 +425,21 @@ export interface RenderedSprite {
    * on the level-0 page only.
    */
   faceRect: { left: number; top: number; width: number; height: number };
+  /**
+   * Level-0 bust composite descriptor, present only for level:0 renders.
+   * Unlike `page` (the on-stage trim, also used as an approximation for
+   * non-zero levels), the bust page is the FULL, UNTRIMMED authored level-0
+   * PSD canvas: every pose frames its own 205×200 bust independently, so body
+   * /face coords here are raw manifest coords and cross-pose face plates are
+   * NOT valid (exstand getFaceArea/getFaceInfo are per-stand).
+   */
+  facePage?: {
+    w: number;
+    h: number;
+    body: RenderedSpritePart | null;
+    face: RenderedSpritePart | null;
+    rect: { left: number; top: number; width: number; height: number };
+  };
   /** Final placement offsets relative to the (center-x, baseline-y) anchor. */
   offsetX: number;
   offsetY: number;
@@ -496,7 +511,11 @@ export function renderCharacter(
     const faceCode = meta.faces.find(f => f.expression === spec.face)?.layer;
     let faceRow = faceCode ? layers.find(l => l.name === faceCode && l.group_id === baseRow.group_id) : null;
     let faceBase = poseRef.base;
-    if (!faceRow) {
+    // Cross-pose fallback is valid only for the shared full-stand frames of
+    // levels 1/2. Level-0 pages are per-pose authored bust crops whose face
+    // plates use incompatible coordinates; a missing expression there means
+    // body-only, exactly like the engine's per-stand getFaceInfo().
+    if (!faceRow && level !== 0) {
       // cross-pose fallback
       for (const other of ci.poses) {
         if (other.base === poseRef.base) continue;
@@ -550,11 +569,20 @@ export function renderCharacter(
   const toPage = (p: RenderedSpritePart | null): RenderedSpritePart | null =>
     p ? { ...p, x: p.x - page.x, y: p.y - page.y } : null;
 
+  // Level-0 bust: descriptor on the full untrimmed authored canvas with raw
+  // (pre-trim) layer coords; the 顔領域 rect indexes this page directly.
+  let facePage: RenderedSprite['facePage'];
+  if (level === 0) {
+    const fc = meta.canvas['0'] || [205, 200];
+    facePage = { w: fc[0], h: fc[1], body, face, rect: faceRect };
+  }
+
   return {
     page,
     body: toPage(body),
     face: toPage(face),
     faceRect,
+    facePage,
     offsetX,
     offsetY,
   };
