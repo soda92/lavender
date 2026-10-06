@@ -93,6 +93,8 @@ const dict = {
   'cfg.confirmLoad': { ja: 'ロード時に確認', en: 'Confirm before load' },
   'cfg.confirmQSave': { ja: 'クイックセーブ時に確認', en: 'Confirm quick save' },
   'cfg.confirmQLoad': { ja: 'クイックロード時に確認', en: 'Confirm quick load' },
+  'cfg.r18Blur': { ja: 'R18 シーンバナーをぼかす', en: 'Blur R18 scene banners' },
+  'cfg.r18BlurSub': { ja: 'scene replay', en: 'scene replay' },
   'cfg.messageSpeed': { ja: 'メッセージ速度', en: 'Message speed' },
   'cfg.messageSpeedSub': { ja: 'message speed', en: 'message speed' },
   'cfg.skipMode': { ja: 'スキップモード', en: 'Skip mode' },

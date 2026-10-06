@@ -75,12 +75,13 @@ const Segmented: React.FC<{
 
 /** Checkbox + label (engine ask%cref / wide toggle replacement). */
 const Check: React.FC<{
-  checked: boolean; onChange: () => void; label: string;
-}> = ({ checked, onChange, label }) => (
+  checked: boolean; onChange: () => void; label: string; ariaLabel?: string;
+}> = ({ checked, onChange, label, ariaLabel }) => (
   <button className={`cfg-check${checked ? ' is-on' : ''}`}
+    aria-label={ariaLabel || undefined}
     onClick={e => { e.currentTarget.blur(); onChange(); }}>
     <span className="cfg-check-box" aria-hidden="true" />
-    <span className="cfg-check-label">{label}</span>
+    {label && <span className="cfg-check-label">{label}</span>}
   </button>
 );
 
@@ -175,6 +176,11 @@ const SystemPage: React.FC<{ runner: any; onToggleFs: () => void }> = ({ runner,
                 onChange={() => set({ [k]: !ask(k) })} />
             ))}
           </div>
+        </Row>
+        <Row>
+          <Label jp={t('cfg.r18Blur')} en={t('cfg.r18BlurSub')} />
+          <Check checked={sf.r18BannerBlur !== false} label="" ariaLabel={t('cfg.r18Blur')}
+            onChange={() => set({ r18BannerBlur: sf.r18BannerBlur === false })} />
         </Row>
       </Section>
 

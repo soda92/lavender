@@ -94,6 +94,7 @@ export const CFG_DEFAULTS: Record<string, any> = {
   confirmLoad: true,
   confirmQSave: true,
   confirmQLoad: true,
+  r18BannerBlur: true,
   textPos: 32,
   skipMode: 'ALL',
   autoPos: 110,

@@ -311,7 +311,10 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack, audio, initialViewMode = '
             const sc = pageSlice[i] as SceneEntry | undefined;
             if (!sc) return null;
             const open = isSceneUnlocked(seen, sc);
-            const isRevealed = revealed.has(sc.id);
+            // Modern spoiler guard (config: r18BannerBlur, on by default);
+            // a per-tile reveal click also lifts the blur for this session.
+            const blurOn = sf.r18BannerBlur !== false;
+            const isRevealed = !blurOn || revealed.has(sc.id);
             return (
               <button
                 key={sc.id}

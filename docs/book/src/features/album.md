@@ -22,7 +22,10 @@ cycling pager.
 
 2×2 scene tiles per page from `/api/scenes`; locked scene buttons still
 launch (they deep-link into the scenario — spoilers are hidden by the veil,
-access isn't).
+access isn't). Unlocked R18 banners ship blurred behind a 🔞 veil until the
+tile is revealed for the session; the System config option **Blur R18 scene
+banners** (`sf.r18BannerBlur`, on by default) shows them sharp without the
+veil when unchecked.
 
 ## Sound mode (`SoundMode.tsx`)
 
