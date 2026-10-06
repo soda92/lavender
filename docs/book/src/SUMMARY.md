@@ -13,6 +13,7 @@
 # Engine semantics
 
 - [Compiled script model](./engine/script-model.md)
+- [Flags, points & branching](./engine/flags-points.md)
 - [Stage & camera](./engine/stage-rendering.md)
 - [Characters & sprites](./engine/characters.md)
 - [Event CGs & dynamic layers](./engine/event-layers.md)

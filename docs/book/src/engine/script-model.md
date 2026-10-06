@@ -51,3 +51,7 @@ face expression, x-position, level (depth) and **disposition**. Their order
 is semantically irrelevant except that an explicit disposition token always
 sets the final disposition of that tag. See
 [Characters & sprites](./characters.md) for the state machine.
+
+Story state (affection points, route branches, unlock flags) and the full
+list of compiled expression forms are documented in
+[Flags, points & branching](./flags-points.md).
