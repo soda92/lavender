@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { envYOffset, mediaUrl, renderCharacter, timeDef } from '../game/metadata';
 import { paintSpriteComposite, paintSpriteFace } from '../game/spriteComposite';
 import { SKIN, SKIN2, SYS_BUTTONS } from '../game/skin';
@@ -46,16 +46,9 @@ function bgTransform(stage: StageState): string {
 // show / hide / pose changes (zero time while skipping or seeking).
 const CHAR_FADE_MS = 300;
 
-// Stage-space buffer for pose crossfade snapshots: sprites are bottom-
-// anchored around y=600 and may extend well above/under the stage.
-const GHOST_W = 800;
-const GHOST_H = 1700;
-const GHOST_SY = 1100; // snapshot y = stage y + GHOST_SY
-
 const CharacterView: React.FC<{ ch: CharState; instant?: boolean }> = ({ ch, instant }) => {
   // Debug slow-motion factor for transition inspection (1 = engine speed).
   const timeScale = useDebugTimeScale();
-  const fadeMs = CHAR_FADE_MS * timeScale;
   const rendered = useMemo(
     () => renderCharacter(ch.name, {
       pose: ch.pose,
@@ -70,16 +63,8 @@ const CharacterView: React.FC<{ ch: CharState; instant?: boolean }> = ({ ch, ins
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const animRef = useRef<Animation | null>(null);
-  const firstPaintRef = useRef(true);
   const enterNonceRef = useRef<number | undefined>(undefined);
   const mountedRef = useRef(false);
-  // Pose crossfade snapshots are baked into a fixed stage-space buffer so
-  // the old pose stays at its true stage coordinates even when the new
-  // pose's trimmed page has a different size/anchor.
-  const prevRenderRef = useRef<typeof rendered | null>(null);
-  const canvasAnimRef = useRef<Animation | null>(null);
-  const ghostImgRef = useRef<HTMLImageElement | null>(null);
-  const [ghost, setGhost] = useState<string | null>(null);
 
   // Engine show/hide transitions are imperative tweens (MoveAction +
   // crossfade): WAAPI guarantees the off-screen start frame is painted
@@ -123,98 +108,20 @@ const CharacterView: React.FC<{ ch: CharState; instant?: boolean }> = ({ ch, ins
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ch.leaving, ch.enterAnim, ch.exitAnim, ch.visible, instant, baseOp, timeScale]);
 
+  // Pose/dress/diff/face changes cut instantly. The engine script
+  // (charTrans=crossfade 300ms) crossfades stand layers, but in banter
+  // scenes tags arrive every line and perpetual ghosts feel noisy; the
+  // painter keeps the previous bitmap until the new composite is ready,
+  // so the swap is flash-free. Enter/exit (below) keep their authored
+  // fades/slides.
   useEffect(() => {
     if (!rendered?.body || !canvasRef.current) return;
     let cancelled = false;
     const canvas = canvasRef.current;
-
-    if (firstPaintRef.current || instant) {
-      firstPaintRef.current = false;
-      canvasAnimRef.current?.cancel();
-      setGhost(null);
-      canvas.style.opacity = '1';
-      prevRenderRef.current = rendered;
-      void paintSpriteComposite(rendered, canvas, () => !cancelled);
-      return () => { cancelled = true; };
-    }
-
-    // The instant flag can flip with no art change (seek/skip settling):
-    // nothing visual to crossfade, just restore steady opacity.
-    if (prevRenderRef.current === rendered) {
-      canvasAnimRef.current?.cancel();
-      setGhost(null);
-      canvas.style.opacity = '1';
-      return () => { cancelled = true; };
-    }
-
-    // Read the CURRENT crossfade state before canceling anything (a
-    // fill:forwards animation would otherwise snap opacity back to 1).
-    const canvasOp = parseFloat(getComputedStyle(canvas).opacity) || 0;
-    const prevGhost = ghostImgRef.current;
-    const ghostOp = prevGhost && prevGhost.complete && prevGhost.naturalWidth >= GHOST_W
-      ? parseFloat(getComputedStyle(prevGhost).opacity) || 0
-      : null;
-    canvasAnimRef.current?.cancel();
-
-    // Pose/face change: freeze the CURRENTLY VISIBLE frame (old composite +
-    // any in-flight ghost, each at its current opacity) into a fixed
-    // stage-space buffer, so the snapshot never stretches or moves when the
-    // new pose's trimmed page differs in size/anchor (engine crossfades two
-    // stand layers, each at its own geometry).
-    const prev = prevRenderRef.current;
-    const snapshot = document.createElement('canvas');
-    snapshot.width = GHOST_W;
-    snapshot.height = GHOST_H;
-    const sctx = snapshot.getContext('2d');
-    if (sctx && prev) {
-      const pl = STAGE_W / 2 + ch.xpos + prev.offsetX - prev.page.w / 2;
-      const pt = STAGE_H / 2 + envYOffset() + prev.offsetY - prev.page.h;
-      sctx.globalAlpha = canvasOp;
-      sctx.drawImage(canvas, pl, pt + GHOST_SY, prev.page.w, prev.page.h);
-      if (prevGhost && ghostOp != null && canvasOp < 0.999) {
-        sctx.globalAlpha = ghostOp;
-        sctx.drawImage(prevGhost, 0, 0, GHOST_W, GHOST_H);
-      }
-    }
-    let url: string | null = null;
-    try { url = snapshot.toDataURL(); } catch { /* same-origin only */ }
-    prevRenderRef.current = rendered;
-    setGhost(url);
-    canvas.style.opacity = '0';
-    void paintSpriteComposite(rendered, canvas, () => !cancelled).then(ok => {
-      if (!ok || cancelled) return;
-      // WAAPI keyframes (not CSS transitions): the 0 start frame is painted
-      // regardless of how soon the animation starts, so the new art fades
-      // in from truly transparent instead of snapping to near-full.
-      requestAnimationFrame(() => {
-        if (cancelled) return;
-        canvasAnimRef.current?.cancel();
-        canvasAnimRef.current = canvas.animate(
-          [{ opacity: 0 }, { opacity: 1 }],
-          { duration: fadeMs, easing: 'linear', fill: 'forwards' },
-        );
-        const gi = ghostImgRef.current;
-        if (gi && fadeMs > 0) {
-          gi.animate(
-            [{ opacity: 1 }, { opacity: 0 }],
-            { duration: fadeMs, easing: 'linear', fill: 'forwards' },
-          );
-        }
-      });
-      setTimeout(() => { if (!cancelled) setGhost(null); }, fadeMs + 60);
-    });
+    canvas.style.opacity = '1';
+    void paintSpriteComposite(rendered, canvas, () => !cancelled);
     return () => { cancelled = true; };
-  }, [rendered, instant]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // A freshly baked ghost starts at full opacity; cancel any fade WAAPI left
-  // over from the previous snapshot until the new fade-out starts.
-  useEffect(() => {
-    const gi = ghostImgRef.current;
-    if (gi && ghost) {
-      gi.getAnimations().forEach(a => a.cancel());
-      gi.style.opacity = '1';
-    }
-  }, [ghost]);
+  }, [rendered]);
 
   if (!rendered) return null;
 
@@ -249,7 +156,7 @@ const CharacterView: React.FC<{ ch: CharState; instant?: boolean }> = ({ ch, ins
     >
       {/* Body-less face-only sprites （顔 DISPPOSITION) render directly.
           Normal sprites are single-bitmap composites painted on canvas;
-          the pose-crossfade ghost overlays them in stage space. */}
+          pose/face swaps cut instantly (see paint effect above). */}
       {!composite && rendered.body && (
         <img
           src={rendered.body.url}
@@ -280,29 +187,13 @@ const CharacterView: React.FC<{ ch: CharState; instant?: boolean }> = ({ ch, ins
           }}
         />
       )}
-      {/* Single-bitmap composite: opaque once painted (no face-plate seam
-          under stage scaling); the previous frame crossfades as a
-          stage-space ghost while the new composite fades in. */}
+      {/* Single-bitmap composite: opaque once painted, no face-plate seam
+          under stage scaling; pose/face changes repaint in place. */}
       {composite && (
         <canvas
           ref={canvasRef}
           style={{
             position: 'absolute', inset: 0, width: page.w, height: page.h,
-          }}
-        />
-      )}
-      {ghost && composite && (
-        <img
-          ref={ghostImgRef}
-          src={ghost}
-          alt=""
-          draggable={false}
-          style={{
-            // Snapshot is a fixed 800x1700 stage-space buffer (stage y +1100);
-            // offset it against the current pose's moving root box.
-            position: 'absolute', left: -left, top: GHOST_SY - top,
-            width: GHOST_W, height: GHOST_H,
-            pointerEvents: 'none',
           }}
         />
       )}
