@@ -5,6 +5,7 @@ import {
   overlayUrl, type CgSection, type CgTile, type CgVariant,
 } from '../game/cgGroups';
 import { isSceneUnlocked, sortScenes, type SceneEntry } from '../game/scenes';
+import { anySeen } from '../game/seenGate';
 import { CG_MEMORY, SOUND_SKIN } from '../game/skin';
 import SoundMode from './SoundMode';
 
@@ -22,6 +23,8 @@ interface Props {
   audio: AudioLike;
   initialViewMode?: GalleryMode;
   onPlayScene?: (scene: SceneEntry) => void;
+  /** Toggle the persisted sf.allSeen master switch (engine: tf.allseen). */
+  onToggleAllSeen?: () => void;
 }
 
 interface ViewerState { tile: CgTile; variants: CgVariant[]; idx: number }
@@ -31,8 +34,11 @@ const pos = (r: { x: number; y: number; w?: number; h: number }) => ({
   left: r.x, top: r.y, width: r.w, height: r.h,
 });
 
-const GalleryScreen: React.FC<Props> = ({ sf, onBack, audio, initialViewMode = 'cg', onPlayScene }) => {
+const GalleryScreen: React.FC<Props> = ({ sf, onBack, audio, initialViewMode = 'cg', onPlayScene, onToggleAllSeen }) => {
   const t = useT();
+  // Master "鑑賞モード全ON" switch (engine debug menu -> tf.allseen); the
+  // port persists it in sf. Gates CG / Scene / Sound identically.
+  const allSeen = !!sf.allSeen;
   const [mode, setMode] = useState<GalleryMode>(initialViewMode);
   const [sections, setSections] = useState<CgSection[]>([]);
   const [scenes, setScenes] = useState<SceneEntry[]>([]);
@@ -70,7 +76,7 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack, audio, initialViewMode = '
   useEffect(() => { setPage(1); }, [mode, tab]);
 
   const seen: Record<string, boolean> = sf.cgSeen || {};
-  const isVariantSeen = (v: CgVariant) => !!seen[v.stem] || !!seen[`${v.stem}_l`];
+  const isVariantSeen = (v: CgVariant) => anySeen(allSeen, seen, [v.stem, `${v.stem}_l`]);
   const tileUnlocked = (tile: CgTile) => tile.variants.some(isVariantSeen);
   const unlockedTiles = (list: CgTile[]) => list.filter(tileUnlocked);
 
@@ -104,7 +110,7 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack, audio, initialViewMode = '
       return { unlocked: unlockedTiles(list).length, total: list.length };
     }
     const list = id === 'all' ? scenes : scenes.filter(s => s.heroine === id);
-    return { unlocked: list.filter(s => isSceneUnlocked(seen, s)).length, total: list.length };
+    return { unlocked: list.filter(s => allSeen || isSceneUnlocked(seen, s)).length, total: list.length };
   };
   const currentCount = countFor(tab);
 
@@ -219,8 +225,20 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack, audio, initialViewMode = '
         <img src={mode === 'music' ? SOUND_SKIN.back.over : CG_MEMORY.back.over} alt="" draggable={false} className="hov" />
       </button>
 
+      {/* Modern master unlock switch (engine debug "鑑賞モード全ON" /
+          tf.allseen), available in CG / Scene / Sound modes. */}
+      {onToggleAllSeen && (
+        <button
+          className={`cgmem-allseen ${allSeen ? 'on' : ''}`}
+          onClick={onToggleAllSeen}
+          title={t('gallery.revealAllHint')}
+        >
+          {allSeen ? '🔓 ' : '🔒 '}{t('gallery.revealAll')}
+        </button>
+      )}
+
       {mode === 'music' ? (
-        <SoundMode audio={audio} seen={sf.bgmSeen} />
+        <SoundMode audio={audio} seen={sf.bgmSeen} allSeen={allSeen} />
       ) : (<>
       {/* All view toggle (no shipped bitmap; sits by the pager rule) */}
       <button
@@ -310,7 +328,7 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack, audio, initialViewMode = '
           {CG_MEMORY.scene.origins.map((rect, i) => {
             const sc = pageSlice[i] as SceneEntry | undefined;
             if (!sc) return null;
-            const open = isSceneUnlocked(seen, sc);
+            const open = allSeen || isSceneUnlocked(seen, sc);
             // Modern spoiler guard (config: r18BannerBlur, on by default);
             // a per-tile reveal click also lifts the blur for this session.
             const blurOn = sf.r18BannerBlur !== false;

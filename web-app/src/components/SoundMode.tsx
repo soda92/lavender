@@ -10,6 +10,8 @@ interface Props {
   };
   /** sf.bgmSeen: stems already heard in the game */
   seen?: Record<string, boolean | undefined>;
+  /** sf.allSeen master switch (engine tf.allseen "鑑賞モード全ON") */
+  allSeen?: boolean;
 }
 
 const pos = (r: { x: number; y: number; w?: number; h: number }) => ({
@@ -31,7 +33,7 @@ const fmt = (sec: number) => {
  * per page (two columns of ten), charcoal row for the current track. The
  * transport panel in the empty right half is a modern addition.
  */
-const SoundMode: React.FC<Props> = ({ audio, seen }) => {
+const SoundMode: React.FC<Props> = ({ audio, seen, allSeen = false }) => {
   const t = useT();
   const player = audio.bgmPlayer;
 
@@ -53,8 +55,8 @@ const SoundMode: React.FC<Props> = ({ audio, seen }) => {
   // Canonical order follows soundlist.csv (natural stem order).
   const stems = useMemo(() => Object.keys(titles).sort(naturalCmp), [titles]);
   const unlocked = useMemo(
-    () => new Set(stems.filter(s => seen?.[s])),
-    [stems, seen],
+    () => new Set(allSeen ? stems : stems.filter(s => seen?.[s])),
+    [stems, seen, allSeen],
   );
 
   // The player loops in-game; in the room we want "ended" so tracks advance.

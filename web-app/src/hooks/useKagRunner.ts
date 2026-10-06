@@ -20,6 +20,7 @@ import type { EnvInit, CharDisp } from '../game/metadata';
 export type { CharDisp } from '../game/metadata';
 import { debugMs } from '../game/debugTiming';
 import { boundaryStartsFresh } from '../game/pageBoundary';
+import { mergeSfHydration } from '../game/sfMerge';
 
 // ---------------------------------------------------------------------------
 // World state
@@ -320,6 +321,9 @@ export function useKagRunner(audio: {
     readScenarios: {},
     bgmSeen: {},
     cgSeen: {},
+    // Persisted counterpart of the engine debug menu's tf.allseen
+    // ("鑑賞モード全ON"); gates CG / Scene / Sound galleries together.
+    allSeen: false,
     // config overlay defaults (option.tjs CustomOption); progress keys
     // (readScenarios/bgmSeen/cgSeen) are never reset by 初期化.
     designCursor: true,
@@ -471,10 +475,19 @@ export function useKagRunner(audio: {
   }, [persistSf]);
 
   async function hydrate() {
+    // Local sf is written synchronously on every change; merge it back so a
+    // preference whose server POST failed (heartbeat owned by another tab)
+    // survives a reload. The server copy wins per leaf.
+    let localSf: Record<string, any> = {};
+    try {
+      localSf = JSON.parse(localStorage.getItem(`${storagePrefix}_sf`) || '{}') || {};
+    } catch { /* corrupt local copy */ }
     try {
       const r = await fetch('/api/state', { headers: { 'X-Username': usernameRef.current } });
       const state = await r.json();
-      if (state.sf) setSf(prev => ({ ...prev, ...state.sf }));
+      if (state.sf || Object.keys(localSf).length) {
+        setSf(prev => mergeSfHydration(prev, localSf, state.sf || {}));
+      }
       const slots: Record<string, SaveSlot> = {};
       for (const [id, data] of Object.entries<any>(state.slots || {})) {
         if (data && (data.stage || data.currentScenario)) slots[id] = data as SaveSlot;
@@ -499,7 +512,10 @@ export function useKagRunner(audio: {
         try { slots.autosave = JSON.parse(auto); } catch { /* ignore */ }
       }
       setSaveSlots(slots);
-    } catch { /* offline */ }
+    } catch {
+      // Offline: fall back to the locally persisted sf.
+      if (Object.keys(localSf).length) setSf(prev => mergeSfHydration(prev, localSf));
+    }
   }
 
   // -------------------------------------------------------------------------

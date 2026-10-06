@@ -475,6 +475,21 @@ button.danger { border-color: #b4555f; background: #4d2830; }
 .cgmem-all:hover { background: #efe8fb; }
 .cgmem-all.on { background: #e7dcf7; border-color: #b3a1d4; color: #6f4fb0; }
 
+/* modern master unlock pill (engine debug tf.allseen equivalent) */
+.cgmem-allseen {
+  position: absolute; left: 440px; top: 546px;
+  z-index: 20;
+  padding: 2px 10px;
+  background: rgba(255,255,255,0.72);
+  border: 1px solid #c3b6dd;
+  border-radius: 10px;
+  color: #6a6180;
+  font-size: 11px; letter-spacing: 1px;
+  cursor: var(--cur-over, pointer);
+}
+.cgmem-allseen:hover { background: #efe8fb; }
+.cgmem-allseen.on { background: #e7dcf7; border-color: #b3a1d4; color: #6f4fb0; }
+
 /* face-tab rail: the normal-state bitmap is the base; per-row crops of the
    over/on sprites appear on hover / selection */
 .cgmem-rail { position: absolute; pointer-events: none; }

@@ -193,6 +193,8 @@ export default function App() {
             onSettings={() => runner.setConfigOpen(true)}
             hasAutosave={!!runner.saveSlots.autosave}
             playBgm={audio.playBgm}
+            markBgmSeen={(stem: string) =>
+              runner.setSf((prev: any) => ({ ...prev, bgmSeen: { ...(prev.bgmSeen || {}), [stem]: true } }))}
           />
         )}
 
@@ -205,6 +207,8 @@ export default function App() {
             audio={audio}
             initialViewMode={runner.galleryViewMode}
             onPlayScene={runner.startSceneReplay}
+            onToggleAllSeen={() =>
+              runner.setSf((prev: any) => ({ ...prev, allSeen: !prev.allSeen }))}
           />
         )}
 

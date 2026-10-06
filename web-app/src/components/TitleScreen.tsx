@@ -8,6 +8,9 @@ interface Props {
   onSettings: () => void;
   hasAutosave: boolean;
   playBgm: (stem: string) => void;
+  /** Mark a BGM stem as heard (the engine's title hook plays [bgm01b],
+   *  which sets sf.bgm_BGM01B through KAGEnvBGM, so it stays unlocked). */
+  markBgmSeen?: (stem: string) => void;
 }
 
 // title.csv rows: x=298 w=205, y=349/394/439/484/529 h=43 on an 800x600 stage
@@ -21,14 +24,16 @@ const MENU = [
 const ROW_TOPS = [349, 394, 439, 484, 529];
 
 const TitleScreen: React.FC<Props> = ({
-  onStart, onContinue, onGallery, onSettings, hasAutosave, playBgm,
+  onStart, onContinue, onGallery, onSettings, hasAutosave, playBgm, markBgmSeen,
 }) => {
   const [hover, setHover] = useState<number | null>(null);
 
   useEffect(() => {
-    // Title theme.
-    playBgm('bgm01a');
-  }, [playBgm]);
+    // Title theme (custom.ks *title_bgm -> [bgm01b]); the macro marks it
+    // heard, so the track stays unlocked in the sound room.
+    playBgm('bgm01b');
+    markBgmSeen?.('bgm01b');
+  }, [playBgm, markBgmSeen]);
 
   const onPick = (id: string) => {
     switch (id) {

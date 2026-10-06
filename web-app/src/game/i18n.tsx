@@ -184,6 +184,11 @@ const dict = {
   'gallery.endScene': { ja: '回想終了', en: 'End Scene' },
   'gallery.toTitle': { ja: 'タイトルへ', en: 'To Title' },
   'gallery.catAll': { ja: 'すべて', en: 'All' },
+  'gallery.revealAll': { ja: '全表示', en: 'Reveal all' },
+  'gallery.revealAllHint': {
+    ja: 'CG・シーン・サウンドをすべて表示（本体デバッグメニュー「鑑賞モード全ON」相当・設定に保存）',
+    en: 'Show every CG / scene / track (equivalent to debug "gallery all ON"; saved in settings)',
+  },
   'gallery.catAkina': { ja: 'アキナ', en: 'Akina' },
   'gallery.catHaruka': { ja: 'はるか', en: 'Haruka' },
   'gallery.catHikaru': { ja: 'ヒカル', en: 'Hikaru' },

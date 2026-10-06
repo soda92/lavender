@@ -111,6 +111,14 @@ in skip mode), `tf.rollflag` (`"staffroll_"+mp.bgm`), `tf.rollskip`.
 
 ## System flags (`sf.*`) and unlocks
 
+Gallery modes are **heard-/seen-gated**: every mode page checks
+`tf.allseen || sf[seenflag]` (`sysscn/soundmode.tjs:131`, `cgmode.tjs:551`,
+`scenemode.tjs:91`). The per-item flag defaults to `bgm_<STEM>` / the
+`seenflag` CSV column, and `KAGEnvBGM.tjs:78` sets `sf["bgm_"+stem]=true`
+whenever a `[bgm]` macro plays — including the title hook
+(`custom.ks *title_bgm` plays `[bgm01b]`), so the title track is unlocked
+from the first visit. Locked rows render `？？？` and are disabled.
+
 - **Ending flags** — the last chapter of each route sets one of
   `sf.akina` / `sf.haruka` / `sf.hikaru` / `sf.reika` / `sf.riko` to `1`
   (`lave.akina4`, `lave.haruka3`, `lave.hikaru3`, `lave.reika3`,
@@ -122,6 +130,16 @@ in skip mode), `tf.rollflag` (`"staffroll_"+mp.bgm`), `tf.rollskip`.
 - **CG gallery** seen-state is maintained by our runner as `cgSeen` /
   `bgmSeen` maps inside `sf`.
 - `sf.clear=true` is set from `start.ks` (New Game entry).
+- **`tf.allseen`** ("鑑賞モード全ON") is a *session-only* checkbox in the
+  engine's debug menu (`Override.tjs:1060`) that simultaneously unlocks CG,
+  Scene, and Sound modes plus extras. The web port exposes the same master
+  switch as the modern **Reveal all** pill in the album, but persists it as
+  `sf.allSeen` (`game/seenGate.ts`, predicate `itemSeen`/`anySeen`).
+  The title screen also marks its track heard explicitly because it starts
+  BGM directly (`TitleScreen` → `markBgmSeen`) rather than through a
+  scenario `[bgm]` command. Authentic title music is `bgm01b`
+  （光の輪の町）, via `custom.ks *title_bgm`; `bgm01a` （ラベンダーの少女）
+  is the OP-vocal track.
 
 ## Persistence
 
@@ -131,7 +149,10 @@ in skip mode), `tf.rollflag` (`"staffroll_"+mp.bgm`), `tf.rollskip`.
   saves default to `{}`.
 - `sf` is additionally persisted on its own (debounced): locally in
   `localStorage` and server-side per user via `/api/save-sf`, so gallery /
-  ending unlocks survive without a slot save.
+  ending unlocks survive without a slot save. Hydration layers
+  defaults → localStorage → server (`game/sfMerge.ts`); the server wins per
+  leaf but the local copy fills gaps, so a POST rejected by heartbeat
+  ownership does not lose local-only changes on reload.
 
 See also [Skip, seek & replay](./skip-seek.md) for how branches replay
 during seeks and [Saves, config & UI](../features/saves-ui.md) for slot
