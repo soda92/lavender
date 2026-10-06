@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { envYOffset, mediaUrl, renderCharacter, timeDef } from '../game/metadata';
 import { paintSpriteComposite, paintSpriteFace } from '../game/spriteComposite';
 import { SKIN, SKIN2, SYS_BUTTONS } from '../game/skin';
@@ -33,7 +33,11 @@ function bgTransform(stage: StageState): string {
   return `translate(${x}px, ${y}px) scale(${z})`;
 }
 
-const CharacterView: React.FC<{ ch: CharState }> = ({ ch }) => {
+// Engine charDispTrans / charTrans: per-layer 300ms crossfade for
+// show / hide / pose changes (zero time while skipping or seeking).
+const CHAR_FADE_MS = 300;
+
+const CharacterView: React.FC<{ ch: CharState; instant?: boolean }> = ({ ch, instant }) => {
   const rendered = useMemo(
     () => renderCharacter(ch.name, {
       pose: ch.pose,
@@ -44,14 +48,85 @@ const CharacterView: React.FC<{ ch: CharState }> = ({ ch }) => {
     }),
     [ch.name, ch.pose, ch.dress, ch.diff, ch.face, ch.level],
   );
+  const baseOp = ch.opacity != null ? ch.opacity / 255 : 1;
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const animRef = useRef<Animation | null>(null);
+  const firstPaintRef = useRef(true);
+  const enterNonceRef = useRef<number | undefined>(undefined);
+  const mountedRef = useRef(false);
+  // Previous composite kept as a ghost while a new one crossfades in.
+  const [ghost, setGhost] = useState<string | null>(null);
+  const [curOpacity, setCurOpacity] = useState(1);
+
+  // Engine show/hide transitions are imperative tweens (MoveAction +
+  // crossfade): WAAPI guarantees the off-screen start frame is painted
+  // before the transition runs, unlike rAXF state flips.
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    animRef.current?.cancel();
+    animRef.current = null;
+    if (instant) return;
+    const play = (dxFrom: number, opFrom: number, dxTo: number, opTo: number, ms: number) => {
+      if (ms <= 0) return;
+      const a = el.animate(
+        [
+          { transform: `translateX(${dxFrom}px)`, opacity: opFrom },
+          { transform: `translateX(${dxTo}px)`, opacity: opTo },
+        ],
+        { duration: ms, easing: 'linear', fill: 'forwards' },
+      );
+      animRef.current = a;
+      // Steady inline style equals the end keyframe: release after finish
+      // without a visual pop.
+      a.onfinish = () => a.cancel();
+    };
+    if (ch.leaving) {
+      const a = ch.exitAnim;
+      play(0, baseOp, a?.dx ?? 0, 0, a?.ms ?? CHAR_FADE_MS);
+      return;
+    }
+    const enter = ch.enterAnim;
+    if (enter && enterNonceRef.current !== enter.nonce) {
+      enterNonceRef.current = enter.nonce;
+      play(enter.dx, 0, 0, baseOp, enter.ms);
+      return;
+    }
+    if (!mountedRef.current) {
+      // No named enter: engine charDispTrans 300ms crossfade.
+      mountedRef.current = true;
+      play(0, 0, 0, baseOp, CHAR_FADE_MS);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ch.leaving, ch.enterAnim, ch.exitAnim, ch.visible, instant, baseOp]);
 
   useEffect(() => {
     if (!rendered?.body || !canvasRef.current) return;
     let cancelled = false;
-    void paintSpriteComposite(rendered, canvasRef.current, () => !cancelled);
+    const canvas = canvasRef.current;
+
+    if (firstPaintRef.current || instant) {
+      firstPaintRef.current = false;
+      setGhost(null);
+      setCurOpacity(1);
+      void paintSpriteComposite(rendered, canvas, () => cancelled);
+      return () => { cancelled = true; };
+    }
+
+    // Pose/face change: freeze the old paint, build the new composite
+    // underneath, then crossfade (engine charTrans = 300ms).
+    let snapshot: string | null = null;
+    try { snapshot = canvas.toDataURL(); } catch { /* same-origin only */ }
+    setGhost(snapshot);
+    setCurOpacity(0);
+    void paintSpriteComposite(rendered, canvas, () => cancelled).then(() => {
+      if (cancelled) return;
+      requestAnimationFrame(() => requestAnimationFrame(() => setCurOpacity(1)));
+      setTimeout(() => { if (!cancelled) setGhost(null); }, CHAR_FADE_MS + 60);
+    });
     return () => { cancelled = true; };
-  }, [rendered]);
+  }, [rendered, instant]);
 
   if (!rendered) return null;
 
@@ -61,11 +136,14 @@ const CharacterView: React.FC<{ ch: CharState }> = ({ ch }) => {
   const { page } = rendered;
   const left = STAGE_W / 2 + ch.xpos + rendered.offsetX - page.w / 2;
   const top = STAGE_H / 2 + envYOffset() + rendered.offsetY - page.h;
-  // Face-only (顔 DISPPOSITION) sprites have no body to composite.
+  // Face-only （顔 DISPPOSITION) sprites have no body to composite.
   const composite = !!rendered.body;
+  // Static resting style; the enter/exit WAAPI tween overrides it while alive.
+  const rootOp = ch.visible ? baseOp : 0;
 
   return (
     <div
+      ref={rootRef}
       className="char-sprite"
       style={{
         position: 'absolute',
@@ -73,8 +151,11 @@ const CharacterView: React.FC<{ ch: CharState }> = ({ ch }) => {
         left,
         width: page.w,
         height: page.h,
-        opacity: ch.opacity != null ? ch.opacity / 255 : 1,
+        opacity: rootOp,
+        transform: 'translateX(0px)',
         zIndex: ch.front ? 40 : 20,
+        pointerEvents: 'none',
+        willChange: 'transform, opacity',
       }}
     >
       {rendered.body && (
@@ -113,7 +194,24 @@ const CharacterView: React.FC<{ ch: CharState }> = ({ ch }) => {
       {composite && (
         <canvas
           ref={canvasRef}
-          style={{ position: 'absolute', inset: 0, width: page.w, height: page.h }}
+          style={{
+            position: 'absolute', inset: 0, width: page.w, height: page.h,
+            opacity: curOpacity,
+            transition: instant ? 'none' : `opacity ${CHAR_FADE_MS}ms linear`,
+          }}
+        />
+      )}
+      {ghost && composite && (
+        <img
+          src={ghost}
+          alt=""
+          draggable={false}
+          style={{
+            position: 'absolute', inset: 0, width: page.w, height: page.h,
+            opacity: 1 - curOpacity,
+            transition: instant ? 'none' : `opacity ${CHAR_FADE_MS}ms linear`,
+            pointerEvents: 'none',
+          }}
         />
       )}
     </div>
@@ -193,8 +291,10 @@ const MiniFace: React.FC<{ ch: CharState; mask: string }> = ({ ch, mask }) => {
   );
 };
 
-const SceneView: React.FC<{ stage: StageState }> = ({ stage }) => {
-  const chars = Object.values(stage.chars as Record<string, CharState>).filter(c => c.visible);
+const SceneView: React.FC<{ stage: StageState; instant?: boolean }> = ({ stage, instant }) => {
+  // leaving chars are kept mounted for their fade-out.
+  const chars = Object.values(stage.chars as Record<string, CharState>)
+    .filter(c => c.visible || c.leaving);
   const layers = Object.values(stage.layers as Record<string, DynLayer>).filter(l => l.visible);
   const bgStem = stage.bgHidden ? null : stage.bg?.stem;
   const bgUrl = bgStem ? mediaUrl(bgStem) : '';
@@ -218,11 +318,15 @@ const SceneView: React.FC<{ stage: StageState }> = ({ stage }) => {
       {layers.filter(l => !l.front).map(l => <LayerView key={l.name} layer={l} />)}
 
       {/* characters */}
-      {chars.filter(c => !c.front).map(c => <CharacterView key={c.name} ch={c} />)}
+      {chars.filter(c => !c.front).map(c => (
+        <CharacterView key={c.name} ch={c} instant={instant} />
+      ))}
 
       {/* front layers */}
       {layers.filter(l => l.front).map(l => <LayerView key={l.name} layer={l} />)}
-      {chars.filter(c => c.front).map(c => <CharacterView key={c.name} ch={c} />)}
+      {chars.filter(c => c.front).map(c => (
+        <CharacterView key={c.name} ch={c} instant={instant} />
+      ))}
     </div>
   );
 };
@@ -232,7 +336,7 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
     stage, stageTransition, speaker, typewriterText, dialogueText, isWaiting, textVisible,
     advance, choiceOptions, chooseOption, chapterCard, video, onVideoEnded,
     isAutoMode, toggleAuto,
-    isFastForward, toggleFastForward, quickLoad, saveToSlot,
+    isFastForward, isSeeking, toggleFastForward, quickLoad, saveToSlot,
     windowHidden, setWindowHidden, sf,
     sideTab, setSideTab, setGameState, replayVoice, currentVoice,
     configOpen, setConfigOpen, requestConfirm,
@@ -275,7 +379,10 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
       onClick={() => advance()}
     >
       {/* current scene */}
-      <SceneView stage={stage} />
+      <SceneView
+        stage={stage}
+        instant={isFastForward || isSeeking || !!stageTransition}
+      />
 
       {/* recollection replay: quit back to the scene gallery */}
       {runner.sceneReplay && (
@@ -297,7 +404,7 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
             animationDuration: `${stageTransition.ms}ms`,
           }}
         >
-          <SceneView stage={stageTransition.old} />
+          <SceneView stage={stageTransition.old} instant />
         </div>
       )}
 

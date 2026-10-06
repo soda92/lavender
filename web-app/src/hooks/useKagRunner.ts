@@ -27,6 +27,12 @@ export interface CharState {
   dress?: string;
   diff?: string;
   face?: string;
+  /** Fading out after a hide (engine charDispTrans crossfade 300ms). */
+  leaving?: boolean;
+  /** Show transition: start offset dx px (showaction MoveAction) + duration. */
+  enterAnim?: { dx: number; ms: number; nonce: number };
+  /** Hide transition: end offset dx px (hideaction MoveAction) + duration. */
+  exitAnim?: { dx: number; ms: number; nonce: number };
 }
 
 export interface DynLayer {
@@ -97,6 +103,14 @@ interface SaveSlot {
   note?: string;
   pinned?: boolean;
   historyLog?: HistoryItem[];
+}
+
+// Parses an engine MoveAction relative spec ("@", "@-100", "@+200") into a
+// pixel delta relative to the current property value.
+function parseMoveRel(spec: unknown): number {
+  if (typeof spec !== 'string' || spec === '@') return 0;
+  const m = /^@([+-]?\d+)$/.exec(spec);
+  return m ? parseInt(m[1], 10) : 0;
 }
 
 // Maps an Akabei endtrans method name to a CSS animation + default duration.
@@ -202,6 +216,9 @@ export function useKagRunner(audio: {
   const [currentScenario, setCurrentScenario] = useState('start');
   const [pointer, setPointer] = useState(0);
   const [stage, setStage] = useState<StageState>(structuredClone(EMPTY_STAGE));
+  // True while a flipper seek silently rebuilds the scene: char fades are
+  // suppressed so the scrubbed scene doesn't trail ghosts.
+  const [isSeeking, setIsSeeking] = useState(false);
   const [stageTransition, setStageTransition] = useState<{
     old: StageState; cls: string; ms: number; key: number;
   } | null>(null);
@@ -442,10 +459,60 @@ export function useKagRunner(audio: {
   // Stage mutation helpers
   // -------------------------------------------------------------------------
 
+  // Fade-out timers for chars hidden outside a transition block.
+  const leavingTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const animNonceRef = useRef(0);
+
+  const clearLeavingTimers = () => {
+    for (const t of Object.values(leavingTimersRef.current)) clearTimeout(t);
+    leavingTimersRef.current = {};
+  };
+
+  const pruneLeaving = (name: string) => {
+    delete leavingTimersRef.current[name];
+    const cur = stageRef.current.chars[name];
+    if (cur && !cur.visible) {
+      delete stageRef.current.chars[name];
+      const n2 = structuredClone(stageRef.current);
+      lastCommittedRef.current = n2;
+      if (!transOpenRef.current) setStage(n2);
+    }
+  };
+
   // Visual changes inside a begintrans/endtrans block mutate the draft but are
   // committed once at endtrans; outside blocks commit immediately.
-  const commitStage = () => {
+  // transitional: an endtrans is committing — the whole-frame overlay already
+  // crossfades hiders, so per-char leaving snapshots are not needed.
+  const commitStage = (transitional = false) => {
+    const prev = lastCommittedRef.current;
+    const instant = fastRef.current || seekRef.current != null || silentRef.current;
     const next = structuredClone(stageRef.current);
+    if (!transitional && !instant && prev) {
+      for (const [name, ch] of Object.entries(next.chars)) {
+        if (ch.visible && ch.leaving) {
+          ch.leaving = false;
+          const tm = leavingTimersRef.current[name];
+          if (tm) { clearTimeout(tm); delete leavingTimersRef.current[name]; }
+        } else if (!ch.visible && !ch.leaving && prev.chars[name]) {
+          const pc = prev.chars[name];
+          if (pc.leaving) {
+            // An unrelated commit happened mid-fade: keep the snapshot until
+            // its prune timer fires (the draft itself is flag-less).
+            next.chars[name] = { ...pc, visible: false };
+          } else if (pc.visible) {
+            // Engine: char layers crossfade/slide on hide (charDispTrans or
+            // the tag's named transition); keep the previous appearance as a
+            // snapshot carrying the exit animation descriptor.
+            const ms = ch.exitAnim?.ms ?? 300;
+            next.chars[name] = {
+              ...pc, visible: false, leaving: true,
+              exitAnim: ch.exitAnim ?? { dx: 0, ms: 300, nonce: -1 },
+            };
+            leavingTimersRef.current[name] = setTimeout(() => pruneLeaving(name), ms + 60);
+          }
+        }
+      }
+    }
     lastCommittedRef.current = next;
     if (!transOpenRef.current) setStage(next);
   };
@@ -524,6 +591,7 @@ export function useKagRunner(audio: {
     if (opts.seek != null) {
       // Rebuild the scene by silently replaying from the file start; the seek
       // pointer is the stop boundary handled inside runSlice.
+      clearLeavingTimers();
       stageRef.current = structuredClone(EMPTY_STAGE);
       lastCommittedRef.current = structuredClone(EMPTY_STAGE);
       transOpenRef.current = false;
@@ -533,6 +601,7 @@ export function useKagRunner(audio: {
       setVideo(null);
       seekRef.current = Math.max(0, opts.seek);
       silentRef.current = true;
+      setIsSeeking(true);
       speakerRef.current = '';
       setSpeaker('');
       setDialogueText('');
@@ -542,6 +611,7 @@ export function useKagRunner(audio: {
     } else {
       seekRef.current = null;
       silentRef.current = false;
+      setIsSeeking(false);
       applyScenarioData(name, json.instructions, label, overridePtr);
     }
     freshLineRef.current = true;
@@ -566,6 +636,10 @@ export function useKagRunner(audio: {
   }, [loadScenario]);
 
   const startNewGame = useCallback(() => {
+    clearLeavingTimers();
+    seekRef.current = null;
+    silentRef.current = false;
+    setIsSeeking(false);
     stageRef.current = structuredClone(EMPTY_STAGE);
     commitStage();
     setHistoryLog([]);
@@ -626,8 +700,10 @@ export function useKagRunner(audio: {
     runTokenRef.current++;
     runningRef.current = false;
     if (typingRef.current) { clearInterval(typingRef.current.timer); typingRef.current = null; }
+    clearLeavingTimers();
     seekRef.current = null;
     silentRef.current = false;
+    setIsSeeking(false);
     choiceOpenRef.current = false;
     pendingChoicesRef.current = [];
     setChoiceOptions(null);
@@ -665,6 +741,8 @@ export function useKagRunner(audio: {
     setSceneReplay(null);
     seekRef.current = null;
     silentRef.current = false;
+    setIsSeeking(false);
+    clearLeavingTimers();
     stageRef.current = structuredClone(EMPTY_STAGE);
     lastCommittedRef.current = structuredClone(EMPTY_STAGE);
     transOpenRef.current = false;
@@ -707,6 +785,7 @@ export function useKagRunner(audio: {
     if (!hasVisualTokens) return; // transition-only action
 
     const ch = ensureChar(name);
+    const wasVisible = ch.visible;
     let touched = false;
     for (const tok of argv) {
       const kind = classifyToken(name, tok);
@@ -748,6 +827,27 @@ export function useKagRunner(audio: {
     if (args.xpos != null) ch.xpos = parseInt(String(args.xpos), 10) || 0;
     if (!ch.diff) ch.diff = '基本';
     if (touched) ch.visible = ch.visible || !argv.some(t => classifyToken(name, t) === 'hide');
+
+    // Named per-layer transition (スライド出/消 etc.): drives a slide/fade
+    // in the view. Suppressed during seek replay / fast forward (engine
+    // zeroes transition times while skipping).
+    const instant = fastRef.current || seekRef.current != null || silentRef.current;
+    if (!instant && touched && wasVisible !== ch.visible) {
+      const transTok = [...argv].reverse().find(t => classifyToken(name, t) === 'transition');
+      const def = transTok ? envinitRef.current?.transitions?.[transTok] : undefined;
+      const argTime = args.time != null ? parseInt(String(args.time), 10) : NaN;
+      const ms = Math.max(0, Math.min(2000, Number.isFinite(argTime) ? argTime : (def?.time ?? 300)));
+      const nonce = ++animNonceRef.current;
+      if (ch.visible) {
+        const spec = (def as any)?.showaction?.left?.start;
+        ch.enterAnim = { dx: parseMoveRel(spec), ms, nonce };
+        delete ch.exitAnim;
+      } else {
+        const spec = (def as any)?.hideaction?.left?.value;
+        ch.exitAnim = { dx: parseMoveRel(spec), ms, nonce };
+        delete ch.enterAnim;
+      }
+    }
   };
 
   const upsertLayer = (key: string, init: Partial<DynLayer>): DynLayer => {
@@ -886,7 +986,7 @@ export function useKagRunner(audio: {
       const drawFactor = Math.max(0, Math.min(2, 2 - (sfRef.current.drawPos ?? 120) / 120 * 1));
       const ms = Math.round((waitMs || anim.ms) * drawFactor);
       const old = lastCommittedRef.current;
-      commitStage(); // reveal the new scene underneath
+      commitStage(true); // reveal the new scene underneath
       if (!skipping) {
         setStageTransition({ old, cls: anim.cls, ms, key: ++transKeyRef.current });
         clearTimeout(transitionTimerRef.current);
@@ -1277,6 +1377,7 @@ export function useKagRunner(audio: {
   const finishSeek = () => {
     seekRef.current = null;
     silentRef.current = false;
+    setIsSeeking(false);
     // A seek can land on the second half of a [*]-split line: keep the page
     // open so the next click appends instead of replacing the shown text.
     freshLineRef.current = !pageContinues(ptrRef.current);
@@ -1621,13 +1722,15 @@ export function useKagRunner(audio: {
   }, []);
 
   const toggleFastForward = useCallback(() => {
-    setIsFastForward(v => {
-      const next = !v;
-      fastRef.current = next;
-      if (next) setIsAutoMode(false);
+    // Flip the ref synchronously: advances issued in the same tick must
+    // already see fast-forward (transition times are zeroed while skipping).
+    const next = !fastRef.current;
+    fastRef.current = next;
+    setIsFastForward(next);
+    if (next) {
+      setIsAutoMode(false);
       autoRef.current = false;
-      return next;
-    });
+    }
   }, []);
 
   // auto / skip driver
@@ -1660,19 +1763,29 @@ export function useKagRunner(audio: {
   // Saves
   // -------------------------------------------------------------------------
 
-  const buildSaveData = (): SaveSlot => ({
-    currentScenario: scenarioRef.current,
-    pointer: ptrRef.current,
-    f: fRef.current,
-    sf: sfRef.current,
-    tf: tfRef.current,
-    stage: structuredClone(stageRef.current),
-    bgm: bgmRef.current,
-    speaker: speakerRef.current,
-    dialogueText,
-    timestamp: Date.now(),
-    date: new Date().toLocaleString(),
-  });
+  const buildSaveData = (): SaveSlot => {
+    // Transient per-layer tween state must not survive a save/load cycle
+    // (otherwise loading would replay character entrance animations).
+    const stage = structuredClone(stageRef.current);
+    for (const c of Object.values(stage.chars)) {
+      delete c.enterAnim;
+      delete c.exitAnim;
+      delete c.leaving;
+    }
+    return {
+      currentScenario: scenarioRef.current,
+      pointer: ptrRef.current,
+      f: fRef.current,
+      sf: sfRef.current,
+      tf: tfRef.current,
+      stage,
+      bgm: bgmRef.current,
+      speaker: speakerRef.current,
+      dialogueText,
+      timestamp: Date.now(),
+      date: new Date().toLocaleString(),
+    };
+  };
 
   const writeSlot = (id: string, data: SaveSlot) => {
     setSaveSlots(prev => ({ ...prev, [id]: data }));
@@ -1739,7 +1852,18 @@ export function useKagRunner(audio: {
     sfRef.current = { ...sfRef.current, ...(data.sf || {}) };
     tfRef.current = { ...(data.tf || {}) };
     setF({ ...fRef.current }); setSfState({ ...sfRef.current }); setTf({ ...tfRef.current });
-    if (data.stage) { stageRef.current = structuredClone(data.stage); commitStage(); }
+    clearLeavingTimers();
+    setIsSeeking(false);
+    if (data.stage) {
+      const restored = structuredClone(data.stage);
+      for (const c of Object.values(restored.chars)) {
+        delete c.enterAnim;
+        delete c.exitAnim;
+        delete c.leaving;
+      }
+      stageRef.current = restored;
+      commitStage();
+    }
     textVisibleRef.current = true; setTextVisible(true);
     setWindowHidden(false);
     speakerRef.current = data.speaker || '';
@@ -1804,7 +1928,7 @@ export function useKagRunner(audio: {
     gameState, setGameState,
     currentScenario, pointer,
     stage, stageTransition, speaker, dialogueText, typewriterText,
-    isWaiting, textVisible, advance,
+    isWaiting, textVisible, advance, isSeeking,
     choiceOptions, chooseOption,
     chapterCard, video, onVideoEnded: endVideo,
     bgmStem, currentVoice,
