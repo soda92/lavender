@@ -17,9 +17,15 @@ import { debugMs } from '../game/debugTiming';
 // World state
 // ---------------------------------------------------------------------------
 
+export type CharDisp = 'both' | 'bu' | 'face' | 'clear' | 'invisible';
+
 export interface CharState {
   name: string;
   visible: boolean;
+  /** KAGEnvImage disposition: both/bu = body on stage; face = face-window
+   *  only; clear = erased (a later pose tag re-shows); invisible = suppressed
+   *  (a later pose tag does NOT re-show). */
+  disp: CharDisp;
   front: boolean;
   level: number;
   xpos: number;
@@ -565,7 +571,8 @@ export function useKagRunner(audio: {
     const reg = resolveRegisteredName(name);
     if (!stageRef.current.chars[reg]) {
       stageRef.current.chars[reg] = {
-        name: reg, visible: false, front: false, level: envinitRef.current?.defaultLevel ?? 1,
+        name: reg, visible: false, disp: 'clear', front: false,
+        level: envinitRef.current?.defaultLevel ?? 1,
         xpos: 0, opacity: 255,
       };
     }
@@ -809,6 +816,7 @@ export function useKagRunner(audio: {
     const ch = ensureChar(name);
     const wasVisible = ch.visible;
     let touched = false;
+    let explicitDisp: CharDisp | null = null;
     for (const tok of argv) {
       const kind = classifyToken(name, tok);
       switch (kind) {
@@ -836,9 +844,13 @@ export function useKagRunner(audio: {
           break;
         }
         case 'show':
-          ch.visible = true; touched = true; break;
-        case 'hide':
-          ch.visible = false; touched = true; break;
+          explicitDisp = 'both'; touched = true; break;
+        case 'faceDisp':
+          explicitDisp = 'face'; touched = true; break;
+        case 'hideClear':
+          explicitDisp = 'clear'; touched = true; break;
+        case 'hideInvisible':
+          explicitDisp = 'invisible'; touched = true; break;
         case 'front':
           ch.front = tok === 'front'; touched = true; break;
         default:
@@ -848,7 +860,15 @@ export function useKagRunner(audio: {
     if (args.opacity != null) ch.opacity = parseInt(String(args.opacity), 10) || 0;
     if (args.xpos != null) ch.xpos = parseInt(String(args.xpos), 10) || 0;
     if (!ch.diff) ch.diff = '基本';
-    if (touched) ch.visible = ch.visible || !argv.some(t => classifyToken(name, t) === 'hide');
+    if (explicitDisp) {
+      ch.disp = explicitDisp;
+    } else if (touched && ch.disp === 'clear') {
+      // Engine SHOW auto-select: a pose/dress/face/position tag while CLEAR
+      // brings the body back (BOTH); INVISIBLE stays suppressed; an existing
+      // FACE disposition is kept (the tag only refreshes the bust art).
+      ch.disp = 'both';
+    }
+    ch.visible = ch.disp === 'both' || ch.disp === 'bu';
 
     // Named per-layer transition (スライド出/消 etc.): drives a slide/fade
     // in the view. Suppressed during seek replay / fast forward (engine
@@ -1204,9 +1224,20 @@ export function useKagRunner(audio: {
     // ---- visibility groups ----
     if (name === 'hideall' || name === 'hidechars' || name === 'allchar') {
       const hide = name === 'hideall' || name === 'hidechars' || argv.includes('hide');
-      for (const ch of Object.values(world.chars)) ch.visible = !hide;
+      if (hide) {
+        for (const ch of Object.values(world.chars)) {
+          if (name === 'allchar') {
+            // Engine re-emits the tag only for body-showing (BOTH/BU) chars;
+            // FACE-only busts are left alone.
+            if (ch.disp === 'both' || ch.disp === 'bu') ch.disp = 'clear';
+          } else {
+            ch.disp = 'clear';
+          }
+          // All remaining dispositions (clear/invisible/face) are body-off.
+          ch.visible = false;
+        }
+      }
       if (name === 'hideall') for (const ly of Object.values(world.layers)) ly.visible = false;
-      if (name === 'allchar' && argv.includes('show')) for (const ch of Object.values(world.chars)) ch.visible = true;
       commitStage();
       return 'continue';
     }
@@ -1976,6 +2007,8 @@ export function useKagRunner(audio: {
         delete c.enterAnim;
         delete c.exitAnim;
         delete c.leaving;
+        // Saves written before the disposition model: derive from visible.
+        if (!c.disp) c.disp = c.visible ? 'both' : 'clear';
       }
       for (const l of Object.values(restored.layers)) delete l.anim;
       stageRef.current = restored;

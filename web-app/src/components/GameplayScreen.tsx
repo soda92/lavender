@@ -380,10 +380,11 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
   } = runner;
   const t = useT();
   const immerse = !!sf?.immerseMode;
-  // Message-window face: only when the speaker is a visible stand character.
+  // Message-window bust: speaker is a BOTH/BU stand (env.bothFace) or in
+  // FACE disposition (顔 — body hidden, only the bust appears).
   const faceChar = !speaker ? null : (
     Object.values(stage.chars as Record<string, CharState>)
-      .find(c => c.visible && c.name === speaker) || null
+      .find(c => c.name === speaker && (c.disp === 'both' || c.disp === 'bu' || c.disp === 'face')) || null
   );
   // ウィンドウスタイル: "CG 表示中はシンプルなウィンドウを使用" — while an
   // event CG layer is up, swap message01 for the message02 skin.
@@ -485,6 +486,13 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
       {textVisible && !windowHidden && (shownText || speaker) && !choiceOptions && (
         immerse ? (
           <div className="dialogue-immerse">
+            {/* FACE disposition bust: the engine's face window is independent
+                of the message-window style, so keep skin coordinates. */}
+            {faceChar && (
+              <div style={{ position: 'absolute', left: 0, top: 399, width: 205, height: 201, pointerEvents: 'none' }}>
+                <MiniFace ch={faceChar} mask={SKIN.mesFaceMask} />
+              </div>
+            )}
             <div className="immerse-pill">
               {speaker && <span className="immerse-speaker">［{speaker}］</span>}
               <span className="immerse-text">{shownText}</span>

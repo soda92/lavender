@@ -190,7 +190,8 @@ export function timeDef(timeToken?: string): TimeDef | null {
 /** Classify a character invocation token using envinit + sprite metadata. */
 export type TokenKind =
   | 'pose' | 'dress' | 'diff' | 'face' | 'xpos'
-  | 'level' | 'show' | 'hide' | 'transition' | 'action'
+  | 'level' | 'show' | 'hide' | 'faceDisp' | 'hideClear' | 'hideInvisible'
+  | 'transition' | 'action'
   | 'front' | 'flag' | 'unknown';
 
 const FLAG_WORDS = new Set([
@@ -223,12 +224,19 @@ export function classifyToken(charName: string, token: string): TokenKind {
     if (t.includes('LEVEL')) return 'level';
     if (t.includes('DISPPOSITION')) {
       const disp = pos.disp?.$const || '';
-      // BOTH （出） / BU （立） / FACE （顔） show; INVISIBLE （無） and CLEAR （消） hide.
-      return disp.includes('BOTH') || disp.includes('BU') || disp.includes('FACE') ? 'show' : 'hide';
+      // KAGEnvImage: BOTH （出） / BU （立） show the body; FACE （顔） routes to
+      // the message-window face only (body hidden); CLEAR （消） lets a later
+      // pose/dress/position tag re-show automatically, INVISIBLE （無） does not.
+      if (disp.includes('FACE')) return 'faceDisp';
+      if (disp.includes('INVISIBLE')) return 'hideInvisible';
+      if (disp.includes('CLEAR')) return 'hideClear';
+      return 'show'; // BOTH / BU
     }
   }
   if (token === '出' || token === '立' || token === '入') return 'show';
-  if (token === '消' || token === '無') return 'hide';
+  if (token === '顔') return 'faceDisp';
+  if (token === '消') return 'hideClear';
+  if (token === '無') return 'hideInvisible';
   if (token === '前' || token === '奥' || token === '手前') return 'level';
   if (token === 'front' || token === 'back') return 'front';
   if (m.envinit.transitions[token]) return 'transition';

@@ -23,14 +23,14 @@ beforeAll(() => {
 });
 
 describe('classifyToken — disposition words (envinit DISPPOSITION)', () => {
-  it('無 (INVISIBLE) and 消 (CLEAR) hide', () => {
-    expect(classifyToken('アキナ', '無')).toBe('hide');
-    expect(classifyToken('はるか', '消')).toBe('hide');
+  it('無 (INVISIBLE) and 消 (CLEAR) hide with distinct kinds', () => {
+    expect(classifyToken('アキナ', '無')).toBe('hideInvisible');
+    expect(classifyToken('はるか', '消')).toBe('hideClear');
   });
-  it('出 (BOTH), 立 (BU), 顔 (FACE) show', () => {
+  it('出/立 (BOTH/BU) show the body, 顔 (FACE) is face-window only', () => {
     expect(classifyToken('アキナ', '出')).toBe('show');
     expect(classifyToken('アキナ', '立')).toBe('show');
-    expect(classifyToken('大九郎', '顔')).toBe('show');
+    expect(classifyToken('大九郎', '顔')).toBe('faceDisp');
   });
 });
 
