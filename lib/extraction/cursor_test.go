@@ -32,11 +32,19 @@ func TestRewriteCurHotspot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if hx := binary.LittleEndian.Uint16(got[16:18]); hx != 30 {
+	// entry starts at 6: hotspotX/Y at +4/+6 (abs 10/12), size at +8,
+	// offset at +12 (abs 18: payload begins at 22).
+	if hx := binary.LittleEndian.Uint16(got[10:12]); hx != 30 {
 		t.Fatalf("hotspotX = %d, want 30", hx)
 	}
-	if hy := binary.LittleEndian.Uint16(got[18:20]); hy != 29 {
+	if hy := binary.LittleEndian.Uint16(got[12:14]); hy != 29 {
 		t.Fatalf("hotspotY = %d, want 29", hy)
+	}
+	if binary.LittleEndian.Uint32(got[14:18]) != 1 {
+		t.Fatalf("size field corrupted: %x", got[14:18])
+	}
+	if binary.LittleEndian.Uint32(got[18:22]) != 22 {
+		t.Fatalf("offset field corrupted: %x", got[18:22])
 	}
 	if got[22] != 0xAA {
 		t.Fatalf("payload corrupted")

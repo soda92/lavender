@@ -57,9 +57,10 @@ func RunExtraction(startDir string) {
 		}
 	}
 
-	// Move the design cursors' embedded hotspot to the sprig's stem tip.
-	fmt.Println("\nPatching design-cursor hotspots...")
-	nCur, err := patchCursorHotspots(outputDir)
+	// Move the design cursors' embedded hotspot to the sprig's stem tip and
+	// emit PNG siblings (the web client uses those with explicit CSS hotspots).
+	fmt.Println("\nProcessing design cursors (hotspot + PNG)...")
+	nCur, err := processCursors(outputDir)
 	if err != nil {
 		log.Printf("cursor hotspot patch error: %v", err)
 	} else if nCur > 0 {
