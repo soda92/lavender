@@ -285,6 +285,42 @@ export function charBodyVisible(disp: CharDisp): boolean {
   return disp === 'both' || disp === 'bu';
 }
 
+/** Layer registration point (KAGEnvImage afx/afy). */
+export type OriginX = 'left' | 'center' | 'right';
+export type OriginY = 'top' | 'center' | 'bottom';
+
+/**
+ * KAGEnvImage.originMode 1–9 (clockwise from top-left); 0/other falls back
+ * to the engine defaults (center/center).
+ *   1 2 3     left-top    center-top right-top
+ *   8 9 4  →  left-center center     right-center
+ *   7 6 5     left-bottom center-bottom right-bottom
+ */
+export function originModeToAfAf(mode: number | string | null | undefined): { afx: OriginX; afy: OriginY } {
+  switch (Number(mode)) {
+    case 1: return { afx: 'left',   afy: 'top' };
+    case 2: return { afx: 'center', afy: 'top' };
+    case 3: return { afx: 'right',  afy: 'top' };
+    case 4: return { afx: 'right',  afy: 'center' };
+    case 5: return { afx: 'right',  afy: 'bottom' };
+    case 6: return { afx: 'center', afy: 'bottom' };
+    case 7: return { afx: 'left',   afy: 'bottom' };
+    case 8: return { afx: 'left',   afy: 'center' };
+    case 9: return { afx: 'center', afy: 'center' };
+    default: return { afx: 'center', afy: 'center' };
+  }
+}
+
+const PCT: Record<string, string> = {
+  left: '0%', center: '-50%', right: '-100%',
+  top: '0%', bottom: '-100%',
+};
+
+/** CSS transform that registers an element at xpos/ypos via afx/afy. */
+export function originTranslate(afx: OriginX, afy: OriginY, dx = 0, dy = 0): string {
+  return `translate(${PCT[afx]}, ${PCT[afy]}) translate(${dx}px, ${dy}px)`;
+}
+
 export function resolveRegisteredName(name: string): string {  const m = cache;
   if (!m) return name;
   if (m.charmeta.characters[name]) return name;

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { envYOffset, mediaUrl, renderCharacter, timeDef } from '../game/metadata';
+import { envYOffset, mediaUrl, originTranslate, renderCharacter, timeDef } from '../game/metadata';
 import { paintSpriteComposite, paintSpriteFace } from '../game/spriteComposite';
 import { SKIN, SKIN2, SYS_BUTTONS } from '../game/skin';
 import { useT } from '../game/i18n';
@@ -206,12 +206,17 @@ const LayerView: React.FC<{ layer: DynLayer }> = ({ layer }) => {
   const seenNonces = useRef<Set<number>>(new Set());
   const liveAnims = useRef<Map<number, Animation>>(new Map());
   const timeScale = useDebugTimeScale();
+  // Registration point (engine default center/center; legacy saves may omit).
+  const afx = layer.afx ?? 'center';
+  const afy = layer.afy ?? 'center';
 
   // Scripted pans/fades (time= on ev/newlay/named-layer tags): independent
   // WAAPI tracks for position and opacity, so a fade and a pan issued on
   // back-to-back tags overlap and a later no-time retarget must not restart
   // them. Model values already hold END states: fill:'forwards' is released
-  // on finish with no visual pop.
+  // on finish with no visual pop. Position tracks respect the layer's
+  // registration point (afx/afy; overlays such as the keiko miniscenes use
+  // top-left while event _l masters use center).
   const startTrack = (t: LayerPosTrack | LayerOpTrack, kind: 'pos' | 'op') => {
     const el = ref.current;
     if (!el || seenNonces.current.has(t.nonce)) return;
@@ -219,8 +224,8 @@ const LayerView: React.FC<{ layer: DynLayer }> = ({ layer }) => {
     const anim = kind === 'pos'
       ? el.animate(
           [
-            { transform: `translate(-50%, -50%) translate(${(t as LayerPosTrack).from.x - (t as LayerPosTrack).to.x}px, ${(t as LayerPosTrack).from.y - (t as LayerPosTrack).to.y}px)` },
-            { transform: 'translate(-50%, -50%)' },
+            { transform: originTranslate(afx, afy, (t as LayerPosTrack).from.x - (t as LayerPosTrack).to.x, (t as LayerPosTrack).from.y - (t as LayerPosTrack).to.y) },
+            { transform: originTranslate(afx, afy) },
           ],
           { duration: t.ms * timeScale, easing: t.easing, fill: 'forwards' },
         )
@@ -267,13 +272,14 @@ const LayerView: React.FC<{ layer: DynLayer }> = ({ layer }) => {
         ...(!positioned
           ? { left: 0, top: 0, width: STAGE_W, height: STAGE_H, objectFit: 'contain' }
           : {
-              // Engine alignment is center/center: xpos/ypos name the image
-              // center in stage coordinates (top-left origin, so 400/300 is
-              // mid-stage). Large ("_l") art is 1600x1200 and drawn at its
-              // natural size; the 800x600 stage simply crops it for pans.
+              // xpos/ypos name the registration point named by afx/afy in
+              // stage coordinates: event "_l" masters default to center
+              // (400/300 = mid-stage) and draw at natural size so the
+              // 800x600 stage crops the 1600x1200 art; overlay miniscenes
+              // (origin=1) are top-left registered instead.
               left: layer.xpos ?? 0,
               top: layer.ypos ?? 0,
-              transform: 'translate(-50%, -50%)',
+              transform: originTranslate(afx, afy),
             }),
       }}
     />

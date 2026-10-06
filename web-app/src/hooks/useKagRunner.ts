@@ -12,6 +12,7 @@ import {
   resolveCharDisp,
   allcharHideDisp,
   charBodyVisible,
+  originModeToAfAf,
 } from '../game/metadata';
 import type { EnvInit, CharDisp } from '../game/metadata';
 export type { CharDisp } from '../game/metadata';
@@ -71,6 +72,9 @@ export interface DynLayer {
   xpos: number | null;
   ypos: number | null;
   opacity: number;
+  /** Registration point (KAGEnvImage afx/afy); default center. */
+  afx: 'left' | 'center' | 'right';
+  afy: 'top' | 'center' | 'bottom';
   /** Scripted time= tweens of position/opacity (large-art pans/fades). */
   anim?: LayerAnim;
 }
@@ -891,7 +895,8 @@ export function useKagRunner(audio: {
     if (!stageRef.current.layers[key]) {
       stageRef.current.layers[key] = {
         name: key, visible: true, front: false, level: 5,
-        xpos: null, ypos: null, opacity: 255, ...init,
+        xpos: null, ypos: null, opacity: 255, afx: 'center', afy: 'center',
+        ...init,
       };
     }
     return stageRef.current.layers[key];
@@ -904,6 +909,13 @@ export function useKagRunner(audio: {
     if (args.xpos != null) ly.xpos = parseInt(String(args.xpos), 10);
     if (args.ypos != null) ly.ypos = parseInt(String(args.ypos), 10);
     if (args.opacity != null) ly.opacity = parseInt(String(args.opacity), 10) || 0;
+    // Registration point: origin= (1–9) sets both, afx=/afy= override one.
+    if (args.origin != null) {
+      const o = originModeToAfAf(args.origin);
+      ly.afx = o.afx; ly.afy = o.afy;
+    }
+    if (args.afx === 'left' || args.afx === 'center' || args.afx === 'right') ly.afx = args.afx;
+    if (args.afy === 'top' || args.afy === 'center' || args.afy === 'bottom') ly.afy = args.afy;
     if (argv.includes('show')) ly.visible = true;
     if (argv.includes('hide')) ly.visible = false;
     if (argv.includes('front')) ly.front = true;
@@ -1143,6 +1155,8 @@ export function useKagRunner(audio: {
           ly.file = nextFile;
           if (args.xpos == null) ly.xpos = null;
           if (args.ypos == null) ly.ypos = null;
+          if (args.origin == null && args.afx == null) ly.afx = 'center';
+          if (args.origin == null && args.afy == null) ly.afy = 'center';
         }
       }
       applyLayerArgs(ly, args, argv);
@@ -2005,7 +2019,11 @@ export function useKagRunner(audio: {
         // Saves written before the disposition model: derive from visible.
         if (!c.disp) c.disp = c.visible ? 'both' : 'clear';
       }
-      for (const l of Object.values(restored.layers)) delete l.anim;
+      for (const l of Object.values(restored.layers)) {
+        delete l.anim;
+        if (!l.afx) l.afx = 'center';
+        if (!l.afy) l.afy = 'center';
+      }
       stageRef.current = restored;
       commitStage();
     }

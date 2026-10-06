@@ -7,6 +7,8 @@ import {
   resolveCharDisp,
   allcharHideDisp,
   charBodyVisible,
+  originModeToAfAf,
+  originTranslate,
   __setManifestsForTest,
 } from './metadata';
 import envinit from '../../../extracted_data/envinit.json';
@@ -151,5 +153,50 @@ describe('resolveCharDisp — KAGEnvImage disposition state machine', () => {
     expect(charBodyVisible(disp)).toBe(false);
     disp = resolveCharDisp(disp, 'both', true);   // 出 after the scene
     expect(charBodyVisible(disp)).toBe(true);
+  });
+});
+
+describe('originModeToAfAf — KAGEnvImage origin 1–9', () => {
+  it('maps the clockwise 1–9 enum', () => {
+    expect(originModeToAfAf(1)).toEqual({ afx: 'left', afy: 'top' });
+    expect(originModeToAfAf(2)).toEqual({ afx: 'center', afy: 'top' });
+    expect(originModeToAfAf(3)).toEqual({ afx: 'right', afy: 'top' });
+    expect(originModeToAfAf(4)).toEqual({ afx: 'right', afy: 'center' });
+    expect(originModeToAfAf(5)).toEqual({ afx: 'right', afy: 'bottom' });
+    expect(originModeToAfAf(6)).toEqual({ afx: 'center', afy: 'bottom' });
+    expect(originModeToAfAf(7)).toEqual({ afx: 'left', afy: 'bottom' });
+    expect(originModeToAfAf(8)).toEqual({ afx: 'left', afy: 'center' });
+    expect(originModeToAfAf(9)).toEqual({ afx: 'center', afy: 'center' });
+  });
+
+  it('falls back to engine defaults (center/center) for 0/garbage', () => {
+    // ev_other_13 ships origin=0; omitted origin must behave identically.
+    for (const v of [0, undefined, null, '', 'foo', 10]) {
+      expect(originModeToAfAf(v as any)).toEqual({ afx: 'center', afy: 'center' });
+    }
+  });
+
+  it('accepts numeric strings (tag args arrive as strings)', () => {
+    expect(originModeToAfAf('1')).toEqual({ afx: 'left', afy: 'top' });
+  });
+});
+
+describe('originTranslate — layer registration transform', () => {
+  it('center-registers with -50% (event _l pan masters)', () => {
+    expect(originTranslate('center', 'center')).toBe('translate(-50%, -50%) translate(0px, 0px)');
+  });
+
+  it('top-left registration has no percent offset (keiko miniscenes, origin=1)', () => {
+    expect(originTranslate('left', 'top')).toBe('translate(0%, 0%) translate(0px, 0px)');
+  });
+
+  it('bottom-right registration shifts by -100%', () => {
+    expect(originTranslate('right', 'bottom')).toBe('translate(-100%, -100%) translate(0px, 0px)');
+  });
+
+  it('adds the pan-start delta in px (WAAPI first keyframe)', () => {
+    // keiko1 glides xpos -523 -> 0: the first frame is offset by from-to.
+    expect(originTranslate('left', 'top', -523, 0)).toBe('translate(0%, 0%) translate(-523px, 0px)');
+    expect(originTranslate('center', 'center', 10, -20)).toBe('translate(-50%, -50%) translate(10px, -20px)');
   });
 });

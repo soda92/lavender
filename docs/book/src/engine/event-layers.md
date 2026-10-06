@@ -46,8 +46,20 @@ swap src instantly.
 
 - z-order: `front ? 30+level : 10+level`; event slot defaults front/level 6;
 - unpositioned → `0,0 800×600 object-fit:contain`;
-- positioned → natural size, `left/top=xpos/ypos`,
-  `transform: translate(-50%,-50%)`;
+- positioned → natural size at `xpos/ypos`, offset by the layer's
+  **registration point** (`afx/afy`), which defaults to center/center for
+  event art but is overridden by overlay layers:
+  - `origin=<1..9>` sets both axes (`KAGEnvImage.originMode`, clockwise
+    from top-left: 1=left/top, 2=center/top, … 9=center/center; 0=default);
+    explicit `afx=`/`afy=` strings override one axis,
+  - `vorigin`/`orx`/`ory` set the **view** origin (rotation/zoom pivot),
+    not placement, and are ignored for positioning,
+  - the lave34 keiko miniscenes use `origin=1` (top-left): keiko2's 447 px
+    frame at `xpos=353` ends exactly on the right stage edge, which is
+    impossible under center registration; the cat overlay in lave01 uses
+    `origin=2` (center/top),
+  - `originModeToAfAf`/`originTranslate` in `metadata.ts` are the pure
+    mapping/CSS helpers, unit-tested in `metadata.test.ts`;
 - opacity is 0–255 like the engine.
 
 ## Scripted pans/fades (`time=`/`accel`)
