@@ -321,6 +321,72 @@ export function originTranslate(afx: OriginX, afy: OriginY, dx = 0, dy = 0): str
   return `translate(${PCT[afx]}, ${PCT[afy]}) translate(${dx}px, ${dy}px)`;
 }
 
+/**
+ * View-origin (KAGEnvImage vorigin/orx/ory) in stage px: the point from
+ * which xpos/ypos offsets are measured. Default ("center") is mid-stage
+ * (400/300); vorigin=1 puts the origin at the top-left corner.
+ */
+export function originModeToViewPx(mode: number | string | null | undefined,
+                                   stageW = 800, stageH = 600): { orx: number; ory: number } {
+  const { afx, afy } = originModeToAfAf(mode);
+  return { orx: originWordPxX(afx, stageW), ory: originWordPxY(afy, stageH) };
+}
+
+export function originWordPxX(word: string, stageW = 800): number {
+  if (word === 'left' || word === 'top') return 0;
+  if (word === 'right' || word === 'bottom') return stageW;
+  return stageW / 2; // center
+}
+
+export function originWordPxY(word: string, stageH = 600): number {
+  if (word === 'left' || word === 'top') return 0;
+  if (word === 'right' || word === 'bottom') return stageH;
+  return stageH / 2; // center
+}
+
+/** An `orx`/`ory` tag value: alignment word or a numeric px position. */
+export function originParamPx(v: string | number | null | undefined,
+                              axis: 'x' | 'y', stageW = 800, stageH = 600): number | null {
+  if (v == null || v === '') return null;
+  const s = String(v);
+  if (/^[+-]?(\d+(\.\d*)?|\.\d+)$/.test(s.trim())) return parseFloat(s);
+  return axis === 'x' ? originWordPxX(s, stageW) : originWordPxY(s, stageH);
+}
+
+/** Layer placement inputs after model defaults have been applied. */
+export interface LayerPlacementInput {
+  xpos?: number | null;
+  ypos?: number | null;
+  orx?: number | null;
+  ory?: number | null;
+  afx?: OriginX;
+  afy?: OriginY;
+}
+
+/**
+ * Final top-left of a positioned layer in 800x600 stage coordinates.
+ *
+ * Engine formula (KAGEnvImage.calcPosition -> EnvGraphicLayer.recalcPosition,
+ * camera/shift disabled for the event world and levelz=100 for simple
+ * layers): the xpos/ypos offset is measured from the view origin (orx/ory,
+ * default mid-stage 400/300, set by vorigin), and the image registration
+ * point (afx/afy, default center) is placed there:
+ *
+ *   screenX = orx + xpos - afxFrac * imageWidth
+ *
+ * So a full-bleed 1100x900 scroll layer at xpos=0 lands at x=-150 (covers
+ * the stage), while a vorigin=1 miniscene at xpos=353 lands at x=353.
+ */
+export function layerScreenPlacement(l: LayerPlacementInput, imgW: number, imgH: number,
+                                     stageW = 800, stageH = 600): { x: number; y: number } {
+  const fx = l.afx === 'left' ? 0 : l.afx === 'right' ? imgW : imgW / 2;
+  const fy = l.afy === 'top' ? 0 : l.afy === 'bottom' ? imgH : imgH / 2;
+  return {
+    x: (l.orx ?? stageW / 2) + (l.xpos ?? 0) - fx,
+    y: (l.ory ?? stageH / 2) + (l.ypos ?? 0) - fy,
+  };
+}
+
 export function resolveRegisteredName(name: string): string {  const m = cache;
   if (!m) return name;
   if (m.charmeta.characters[name]) return name;

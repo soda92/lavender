@@ -9,6 +9,9 @@ import {
   charBodyVisible,
   originModeToAfAf,
   originTranslate,
+  originModeToViewPx,
+  originParamPx,
+  layerScreenPlacement,
   __setManifestsForTest,
 } from './metadata';
 import envinit from '../../../extracted_data/envinit.json';
@@ -198,5 +201,84 @@ describe('originTranslate — layer registration transform', () => {
     // keiko1 glides xpos -523 -> 0: the first frame is offset by from-to.
     expect(originTranslate('left', 'top', -523, 0)).toBe('translate(0%, 0%) translate(-523px, 0px)');
     expect(originTranslate('center', 'center', 10, -20)).toBe('translate(-50%, -50%) translate(10px, -20px)');
+  });
+});
+
+describe('originModeToViewPx — vorigin view origin in stage px', () => {
+  it('maps the enum onto stage coordinates', () => {
+    expect(originModeToViewPx(1)).toEqual({ orx: 0, ory: 0 });        // left/top
+    expect(originModeToViewPx(2)).toEqual({ orx: 400, ory: 0 });      // center/top (neko)
+    expect(originModeToViewPx(3)).toEqual({ orx: 800, ory: 0 });      // right/top
+    expect(originModeToViewPx(5)).toEqual({ orx: 800, ory: 600 });
+    expect(originModeToViewPx(9)).toEqual({ orx: 400, ory: 300 });
+  });
+
+  it('0/omitted is the mid-stage default', () => {
+    expect(originModeToViewPx(0)).toEqual({ orx: 400, ory: 300 });
+    expect(originModeToViewPx(undefined)).toEqual({ orx: 400, ory: 300 });
+  });
+});
+
+describe('originParamPx — orx/ory tag values', () => {
+  it('maps alignment words', () => {
+    expect(originParamPx('center', 'x')).toBe(400);
+    expect(originParamPx('left', 'x')).toBe(0);
+    expect(originParamPx('right', 'x')).toBe(800);
+    expect(originParamPx('top', 'y')).toBe(0);
+    expect(originParamPx('bottom', 'y')).toBe(600);
+  });
+  it('passes numeric values through (quiz layer ory=220)', () => {
+    expect(originParamPx('220', 'y')).toBe(220);
+    expect(originParamPx('-600', 'y')).toBe(-600);
+  });
+});
+
+describe('layerScreenPlacement — engine layer placement', () => {
+  it('lave34 sky scroll: 1100x900 at xpos=0 fully covers the 800x600 stage', () => {
+    // Regression: layers were rendered with xpos as the absolute image
+    // center, so the macro scroll layer (default mid-stage view origin)
+    // landed at x=-550 and left the right 250px showing the dojo ("half
+    // sky"). Engine: screenX = orx(400) + xpos(0) - w/2(550) = -150.
+    const start = layerScreenPlacement(
+      { xpos: 0, ypos: -150, afx: 'center', afy: 'center' }, 1100, 900);
+    expect(start).toEqual({ x: -150, y: -300 });
+    const end = layerScreenPlacement(
+      { xpos: 0, ypos: 150, afx: 'center', afy: 'center' }, 1100, 900);
+    expect(end).toEqual({ x: -150, y: 0 });
+    // Both endpoints cover the whole stage horizontally.
+    expect(end.x).toBeLessThanOrEqual(0);
+    expect(end.x + 1100).toBeGreaterThanOrEqual(800);
+  });
+
+  it('keiko miniscenes (vorigin=1 -> orx/ory=0, origin=1 -> afx/afy top-left)', () => {
+    const l = { orx: 0, ory: 0, afx: 'left' as const, afy: 'top' as const };
+    expect(layerScreenPlacement({ ...l, xpos: 0, ypos: 0 }, 523, 371)).toEqual({ x: 0, y: 0 });
+    expect(layerScreenPlacement({ ...l, xpos: 353, ypos: 0 }, 447, 371)).toEqual({ x: 353, y: 0 });
+    expect(layerScreenPlacement({ ...l, xpos: 63, ypos: 153 }, 523, 371)).toEqual({ x: 63, y: 153 });
+  });
+
+  it('riko _l pan master (1600x1200): offsets measured from mid-stage', () => {
+    // start [-200,-400] -> [-600,-700]; end [400,300] -> top-left quadrant.
+    const a = layerScreenPlacement({ xpos: -200, ypos: -400 }, 1600, 1200);
+    expect(a).toEqual({ x: -600, y: -700 });
+    const b = layerScreenPlacement({ xpos: 400, ypos: 300 }, 1600, 1200);
+    expect(b).toEqual({ x: 0, y: 0 });
+  });
+
+  it('neko overlay (vorigin=2 center/top, center afx) stays horizontally centered', () => {
+    // origin=2 => afx center / afy top; vorigin=2 => orx 400 / ory 0.
+    const l = { orx: 400, ory: 0, afx: 'center' as const, afy: 'top' as const };
+    const p = layerScreenPlacement({ ...l, xpos: 0, ypos: 600 }, 400, 300);
+    expect(p).toEqual({ x: 200, y: 600 });
+  });
+
+  it('quiz layer numeric ory=220 with ypos=-600', () => {
+    const p = layerScreenPlacement(
+      { orx: 400, ory: 220, xpos: null, ypos: -600 }, 500, 400);
+    expect(p).toEqual({ x: 150, y: 220 - 600 - 200 });
+  });
+
+  it('plain 800x600 event CG with no coordinates fills the frame', () => {
+    expect(layerScreenPlacement({}, 800, 600)).toEqual({ x: 0, y: 0 });
   });
 });

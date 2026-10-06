@@ -13,6 +13,8 @@ import {
   allcharHideDisp,
   charBodyVisible,
   originModeToAfAf,
+  originModeToViewPx,
+  originParamPx,
 } from '../game/metadata';
 import type { EnvInit, CharDisp } from '../game/metadata';
 export type { CharDisp } from '../game/metadata';
@@ -75,6 +77,13 @@ export interface DynLayer {
   /** Registration point (KAGEnvImage afx/afy); default center. */
   afx: 'left' | 'center' | 'right';
   afy: 'top' | 'center' | 'bottom';
+  /**
+   * View origin in stage px (KAGEnvImage vorigin/orx/ory): the point xpos/
+   * ypos are measured from. Defaults to mid-stage 400/300; vorigin=1 makes
+   * xpos/ypos name top-left stage coordinates.
+   */
+  orx: number | null;
+  ory: number | null;
   /** Scripted time= tweens of position/opacity (large-art pans/fades). */
   anim?: LayerAnim;
 }
@@ -896,6 +905,7 @@ export function useKagRunner(audio: {
       stageRef.current.layers[key] = {
         name: key, visible: true, front: false, level: 5,
         xpos: null, ypos: null, opacity: 255, afx: 'center', afy: 'center',
+        orx: null, ory: null,
         ...init,
       };
     }
@@ -909,13 +919,24 @@ export function useKagRunner(audio: {
     if (args.xpos != null) ly.xpos = parseInt(String(args.xpos), 10);
     if (args.ypos != null) ly.ypos = parseInt(String(args.ypos), 10);
     if (args.opacity != null) ly.opacity = parseInt(String(args.opacity), 10) || 0;
-    // Registration point: origin= (1–9) sets both, afx=/afy= override one.
+    // Registration point: origin= (1–9) sets afx/afy (image fraction),
+    // vorigin= sets orx/ory (view origin in stage px); explicit words win.
     if (args.origin != null) {
       const o = originModeToAfAf(args.origin);
       ly.afx = o.afx; ly.afy = o.afy;
     }
     if (args.afx === 'left' || args.afx === 'center' || args.afx === 'right') ly.afx = args.afx;
     if (args.afy === 'top' || args.afy === 'center' || args.afy === 'bottom') ly.afy = args.afy;
+    if (args.vorigin != null) {
+      const o = originModeToViewPx(args.vorigin);
+      ly.orx = o.orx; ly.ory = o.ory;
+    }
+    {
+      const ox = originParamPx(args.orx, 'x');
+      if (ox != null) ly.orx = ox;
+      const oy = originParamPx(args.ory, 'y');
+      if (oy != null) ly.ory = oy;
+    }
     if (argv.includes('show')) ly.visible = true;
     if (argv.includes('hide')) ly.visible = false;
     if (argv.includes('front')) ly.front = true;
@@ -1157,6 +1178,8 @@ export function useKagRunner(audio: {
           if (args.ypos == null) ly.ypos = null;
           if (args.origin == null && args.afx == null) ly.afx = 'center';
           if (args.origin == null && args.afy == null) ly.afy = 'center';
+          if (args.vorigin == null && args.orx == null) ly.orx = null;
+          if (args.vorigin == null && args.ory == null) ly.ory = null;
         }
       }
       applyLayerArgs(ly, args, argv);
@@ -1196,6 +1219,8 @@ export function useKagRunner(audio: {
         // New artwork resets pan alignment unless this tag repositions it.
         if (args.xpos == null) ly.xpos = null;
         if (args.ypos == null) ly.ypos = null;
+        ly.afx = 'center'; ly.afy = 'center';
+        ly.orx = null; ly.ory = null;
       }
       applyLayerArgs(ly, args, argv);
       if (!argv.includes('hide') && args.visible !== 'false') ly.visible = true;

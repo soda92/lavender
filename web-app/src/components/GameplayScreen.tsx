@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { envYOffset, mediaUrl, originTranslate, renderCharacter, timeDef } from '../game/metadata';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { envYOffset, mediaUrl, layerScreenPlacement, renderCharacter, timeDef } from '../game/metadata';
 import { paintSpriteComposite, paintSpriteFace } from '../game/spriteComposite';
 import { SKIN, SKIN2, SYS_BUTTONS } from '../game/skin';
 import { useT } from '../game/i18n';
@@ -205,18 +205,17 @@ const LayerView: React.FC<{ layer: DynLayer }> = ({ layer }) => {
   const ref = useRef<HTMLImageElement>(null);
   const seenNonces = useRef<Set<number>>(new Set());
   const liveAnims = useRef<Map<number, Animation>>(new Map());
+  const [nat, setNat] = useState({ w: 0, h: 0 });
   const timeScale = useDebugTimeScale();
-  // Registration point (engine default center/center; legacy saves may omit).
-  const afx = layer.afx ?? 'center';
-  const afy = layer.afy ?? 'center';
 
   // Scripted pans/fades (time= on ev/newlay/named-layer tags): independent
   // WAAPI tracks for position and opacity, so a fade and a pan issued on
   // back-to-back tags overlap and a later no-time retarget must not restart
   // them. Model values already hold END states: fill:'forwards' is released
-  // on finish with no visual pop. Position tracks respect the layer's
-  // registration point (afx/afy; overlays such as the keiko miniscenes use
-  // top-left while event _l masters use center).
+  // on finish with no visual pop. Position keyframes are plain px deltas;
+  // the registration math lives in the base left/top below (engine formula
+  // screenX = orx + xpos - afxFrac*w: miniscenes set vorigin=1 so xpos is
+  // top-left, event _l masters use the mid-stage 400/300 view origin).
   const startTrack = (t: LayerPosTrack | LayerOpTrack, kind: 'pos' | 'op') => {
     const el = ref.current;
     if (!el || seenNonces.current.has(t.nonce)) return;
@@ -224,8 +223,8 @@ const LayerView: React.FC<{ layer: DynLayer }> = ({ layer }) => {
     const anim = kind === 'pos'
       ? el.animate(
           [
-            { transform: originTranslate(afx, afy, (t as LayerPosTrack).from.x - (t as LayerPosTrack).to.x, (t as LayerPosTrack).from.y - (t as LayerPosTrack).to.y) },
-            { transform: originTranslate(afx, afy) },
+            { transform: `translate(${(t as LayerPosTrack).from.x - (t as LayerPosTrack).to.x}px, ${(t as LayerPosTrack).from.y - (t as LayerPosTrack).to.y}px)` },
+            { transform: 'translate(0px, 0px)' },
           ],
           { duration: t.ms * timeScale, easing: t.easing, fill: 'forwards' },
         )
@@ -257,6 +256,7 @@ const LayerView: React.FC<{ layer: DynLayer }> = ({ layer }) => {
   const url = mediaUrl(layer.file);
   if (!url) return null;
   const positioned = layer.xpos != null || layer.ypos != null;
+  const pos = nat.w ? layerScreenPlacement(layer, nat.w, nat.h) : null;
   return (
     <img
       ref={ref}
@@ -264,22 +264,27 @@ const LayerView: React.FC<{ layer: DynLayer }> = ({ layer }) => {
       alt=""
       draggable={false}
       className="dyn-layer"
+      onLoad={(e) => {
+        const el = e.currentTarget;
+        if (el.naturalWidth !== nat.w || el.naturalHeight !== nat.h) {
+          setNat({ w: el.naturalWidth, h: el.naturalHeight });
+        }
+      }}
       style={{
         position: 'absolute',
         opacity: layer.opacity / 255,
         display: layer.visible ? 'block' : 'none',
         zIndex: layer.front ? 30 + layer.level : 10 + layer.level,
-        ...(!positioned
+        ...(!positioned || !pos
           ? { left: 0, top: 0, width: STAGE_W, height: STAGE_H, objectFit: 'contain' }
           : {
-              // xpos/ypos name the registration point named by afx/afy in
-              // stage coordinates: event "_l" masters default to center
-              // (400/300 = mid-stage) and draw at natural size so the
-              // 800x600 stage crops the 1600x1200 art; overlay miniscenes
-              // (origin=1) are top-left registered instead.
-              left: layer.xpos ?? 0,
-              top: layer.ypos ?? 0,
-              transform: originTranslate(afx, afy),
+              // Final top-left from the engine placement formula; WAAPI pan
+              // tracks add only px deltas on top of this base (see metadata
+              // layerScreenPlacement: orx/ory view origin + xpos, minus the
+              // afx/afy image fraction — miniscenes use vorigin=1, _l pans
+              // use the mid-stage 400/300 default).
+              left: pos.x,
+              top: pos.y,
             }),
       }}
     />

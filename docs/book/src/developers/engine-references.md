@@ -13,7 +13,7 @@ index maps player subsystems to the exact source of each rule.
 | Character art anchors | `extracted_data/fgimage/charlevel.csv` | level0..3 x/y offsets for 顔分離型 stands; not stage slots |
 | Message bust (顔領域） | `system/standview.tjs`, `system/exstand.tjs` (`facewin`) | face-window routing for FACE; 205×200 level-0 顔領域 crop + 顔mask |
 | Pan macros | `extracted_data/scenario/macro.ks` ≈867–918 | 背景スクロール → `newlay scrl` + opacity/ypos `time` `accel sync` patterns; `beginskip/endskip` |
-| Layer registration | `system/KAGEnvImage.tjs` ≈408–423, 1524–1535 | `origin` 1–9 → afx/afy placement enum (default center/center); `vorigin` → orx/ory view/rotation pivot only |
+| Layer registration | `system/KAGEnvImage.tjs` ≈408–490, 1524–1535, 1905–1930; `system/world.tjs` `EnvGraphicLayer.recalcPosition`; `system/AffineLayer.tjs` ≈940 (`left + imageX − afx`); `main/envinit.tjs:188` (`xmax=scWidth/2`) | two-origin placement `screenX = orx + xpos − afxFrac·w`; `origin`→afx/afy image fraction, `vorigin`→orx/ory view origin (default 400/300); event world is nocamera/noshift, simple layers levelz=100 |
 | Skip semantics | `KAGEnvImage.tjs isSkip()` | SKIP modes; move times zeroed while skipping; `[cancelskip]` at OP end |
 | Skip-range brackets | compiled markers + scenario | `beginskip/endskip` mark *eligible* ranges, never force skip in normal play |
 | Gallery/sound lists | game CSV/PSD data | `cgmemory.csv` tile geometry, `sound.csv` rows; canonical `/api/cglist` |
