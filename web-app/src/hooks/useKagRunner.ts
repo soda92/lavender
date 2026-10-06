@@ -207,6 +207,8 @@ export function useKagRunner(audio: {
   } | null>(null);
   const [speaker, setSpeaker] = useState('');
   const [dialogueText, setDialogueText] = useState('');
+  const dialogueRef = useRef('');
+  useEffect(() => { dialogueRef.current = dialogueText; }, [dialogueText]);
   const [typewriterText, setTypewriterText] = useState('');
   const [isWaiting, setIsWaiting] = useState(false);
   const [textVisible, setTextVisible] = useState(true);
@@ -1181,14 +1183,15 @@ export function useKagRunner(audio: {
   // Interpreter slice
   // -------------------------------------------------------------------------
 
-  const typewriter = (full: string, done: () => void) => {
+  const typewriter = (full: string, done: () => void, prefix = '') => {
     if (fastRef.current) {
       setTypewriterText(full);
       done();
       return;
     }
-    let i = 0;
-    setTypewriterText('');
+    let i = prefix.length;
+    // Mid-line [*] continuations keep the already-revealed prefix visible.
+    setTypewriterText(full.slice(0, i));
     const speed = (sfRef.current.textSpeed ?? 2); // chars per tick
     const timer = setInterval(() => {
       i += speed;
@@ -1212,9 +1215,32 @@ export function useKagRunner(audio: {
 
   const trailRef = useRef<Array<[string, number, string]>>([]);
 
+  // Does the instruction at `p` belong to the SAME displayed page? True for a
+  // mid-line [*] tap point: either an inline wait still ahead of the text, or
+  // a text node sitting directly behind one.
+  const pageContinues = (p: number): boolean => {
+    const data = dataRef.current;
+    if (!data) return false;
+    let i = p;
+    while (data[i]?.type === 'line_feed') i++;
+    if (data[i]?.type === 'wait_click') return true;
+    if (data[i]?.type === 'text') {
+      let j = p - 1;
+      while (j >= 0 && data[j]?.type === 'line_feed') j--;
+      const prev = data[j];
+      if (prev?.type === 'wait_click' && prev.inline) return true;
+    }
+    return false;
+  };
+  const pageContinuesRef = useRef(pageContinues);
+  pageContinuesRef.current = pageContinues;
+
   const finishSeek = () => {
     seekRef.current = null;
     silentRef.current = false;
+    // A seek can land on the second half of a [*]-split line: keep the page
+    // open so the next click appends instead of replacing the shown text.
+    freshLineRef.current = !pageContinues(ptrRef.current);
     // A seek boundary inside an open trans block: reveal the draft as a cut.
     if (transOpenRef.current) {
       transOpenRef.current = false;
@@ -1224,7 +1250,6 @@ export function useKagRunner(audio: {
     commitStage();
     waitingRef.current = true;
     setIsWaiting(true);
-    freshLineRef.current = true;
     if (bgmRef.current) audio.playBgm(bgmRef.current); else audio.stopBgm();
   };
 
@@ -1287,8 +1312,10 @@ export function useKagRunner(audio: {
               textVisibleRef.current = true;
               setTextVisible(true);
             }
-            setDialogueText(prev => (mm ? mm[2] : prev + raw));
-            setTypewriterText(mm ? mm[2] : raw);
+            const next = mm ? mm[2] : dialogueRef.current + raw;
+            dialogueRef.current = next;
+            setDialogueText(next);
+            setTypewriterText(next);
             voiceRef.current = '';
             ptrRef.current++;
             setPointer(ptrRef.current);
@@ -1304,6 +1331,7 @@ export function useKagRunner(audio: {
             setSpeaker(speakerRef.current);
             body = m[2];
           }
+          let prefix = '';
           if (freshLineRef.current) {
             // Spoken lines always carry a 【name】 prefix; narration clears it.
             speakerRef.current = m ? plateName(m[1]) : '';
@@ -1312,6 +1340,7 @@ export function useKagRunner(audio: {
             // and implicitly reopens it when the next line starts.
             textVisibleRef.current = true;
             setTextVisible(true);
+            dialogueRef.current = body;
             setDialogueText(body);
             historyRef.current.push({
               speaker: speakerRef.current,
@@ -1323,22 +1352,48 @@ export function useKagRunner(audio: {
             setHistoryLog([...historyRef.current]);
             markRead(ptrRef.current);
           } else {
-            setDialogueText(prev => prev + body);
+            // Same-page continuation ([*] inline wait): append, keeping the
+            // revealed prefix; history grows the same single entry. A seek
+            // can land on the continuation without having pushed one — in
+            // that case backfill the entry here.
+            prefix = dialogueRef.current;
+            const next = prefix + body;
+            dialogueRef.current = next;
+            setDialogueText(next);
             const last = historyRef.current[historyRef.current.length - 1];
-            if (last) { last.text += body; setHistoryLog([...historyRef.current]); }
+            if (last) {
+              last.text = next;
+            } else {
+              historyRef.current.push({
+                speaker: speakerRef.current,
+                text: next,
+                voice: voiceRef.current,
+                scenario: scenarioRef.current,
+                pointer: ptrRef.current,
+              });
+              markRead(ptrRef.current);
+            }
+            setHistoryLog([...historyRef.current]);
           }
           ptrRef.current++;
           setPointer(ptrRef.current);
           waitingRef.current = true;
           setIsWaiting(true);
           const stopToken = myToken;
-          typewriter(body, () => { if (stopToken === runTokenRef.current) { /* idle on click */ } });
+          const full = freshLineRef.current ? body : dialogueRef.current;
+          const revealed = freshLineRef.current ? '' : prefix;
+          typewriter(full,
+            () => { if (stopToken === runTokenRef.current) { /* idle on click */ } },
+            revealed);
           break;
         }
         if (inst.type === 'wait_click') {
           freshLineRef.current = false;
           ptrRef.current++;
           setPointer(ptrRef.current);
+          // Mid-line [*]: the preceding text node already provided the
+          // click pause — continue on the SAME page without another wait.
+          if (inst.inline) continue;
           if (seekRef.current != null) continue;
           waitingRef.current = true;
           setIsWaiting(true);
@@ -1452,13 +1507,9 @@ export function useKagRunner(audio: {
     }
     if (!waitingRef.current) return;
 
-    const data = dataRef.current;
-    if (!data) return;
-    // peek: is the current instruction a line feed ending this line?
-    const here = data[ptrRef.current];
-    if (here?.type === 'wait_click') {
-      // handled inside runSlice via continue (freshLine stays false)
-    } else {
+    // A mid-line [*] keeps the SAME page open (and the running voice);
+    // anything else is a fresh page.
+    if (!pageContinuesRef.current(ptrRef.current)) {
       freshLineRef.current = true;
       voiceRef.current = '';
       setCurrentVoice('');
