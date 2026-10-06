@@ -1128,8 +1128,10 @@ button.danger { border-color: #b4555f; background: #4d2830; }
   font-size: 12px; line-height: 1.55;
   padding: 5px 8px; border-radius: 4px;
   background: rgba(255,255,255,0.03);
-  opacity: 0.55;
+  opacity: 0.55; cursor: pointer;
+  border-left: 3px solid transparent;
 }
+.flipper-line:hover { opacity: 0.9; background: rgba(157,123,216,0.12); }
 .flipper-line.cur { opacity: 1; background: rgba(157,123,216,0.18); border-left: 3px solid var(--accent); }
 .flipper-line b { color: #c3aef0; }
 .flipper-ptr {

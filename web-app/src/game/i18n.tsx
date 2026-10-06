@@ -64,8 +64,8 @@ const dict = {
   'flipper.jump': { ja: 'ここへ移動', en: 'Move Here' },
   'flipper.empty': { ja: 'この付近に台詞はありません', en: 'No dialogue near here' },
   'flipper.hint': {
-    ja: '移動すると、シナリオ先頭からその位置までを自動再生して場面を復元します（音声・動画は省略）。',
-    en: 'Seeking silently replays the scenario from the start to this point to restore the scene (voice and video are skipped).',
+    ja: 'Enterキー・±ボタン・台詞クリックでその位置へ移動。移動すると、シナリオ先頭からその位置までを自動再生して場面を復元します（音声・動画は省略）。',
+    en: 'Press Enter, use a ± button, or click a line to jump. Seeking silently replays the scenario from the start to this point to restore the scene (voice and video are skipped).',
   },
 
   'archives.search': { ja: 'メモ・台詞・場面を検索…', en: 'Search notes, lines, scenes…' },

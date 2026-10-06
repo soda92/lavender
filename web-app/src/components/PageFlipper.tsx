@@ -46,8 +46,10 @@ const FlipperTab: React.FC<Props> = ({instructions, pointer, scenario, onSeek}) 
   }, [textRows, target]);
 
   const preview = textRows.slice(Math.max(0, anchorIdx - 2), anchorIdx + 3);
-  const step = (d: number) => setTarget(p => Math.max(0, Math.min(max, p + d)));
-  const jump = () => onSeek(target);
+  const clamp = (v: number) => Math.max(0, Math.min(max, v));
+  const go = (v: number) => { const p = clamp(v); setTarget(p); onSeek(p); };
+  const step = (d: number) => go(target + d);
+  const jump = () => go(target);
 
   return (
     <div className="side-body">
@@ -61,6 +63,7 @@ const FlipperTab: React.FC<Props> = ({instructions, pointer, scenario, onSeek}) 
             max={max}
             value={target}
             onChange={e => setTarget(Math.max(0, Math.min(max, parseInt(e.target.value || '0', 10) || 0)))}
+            onKeyDown={e => { if (e.key === 'Enter') jump(); }}
           />
           <span>/ {max}</span>
           <button className="flipper-jump" onClick={jump}>{t('flipper.jump')}</button>
@@ -86,7 +89,15 @@ const FlipperTab: React.FC<Props> = ({instructions, pointer, scenario, onSeek}) 
 
         <div className="flipper-preview">
           {preview.map(r => (
-            <div key={r.index} className={`flipper-line ${r.index === textRows[anchorIdx]?.index ? 'cur' : ''}`}>
+            <div
+              key={r.index}
+              className={`flipper-line ${r.index === textRows[anchorIdx]?.index ? 'cur' : ''}`}
+              role="button"
+              tabIndex={0}
+              title={t('flipper.jump')}
+              onClick={() => go(r.index)}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') go(r.index); }}
+            >
               <span className="flipper-ptr">{r.index}</span>
               {r.speaker && <b>{r.speaker}　</b>}
               <span>{r.text}</span>
