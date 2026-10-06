@@ -70,6 +70,35 @@ function buildComposite(r: RenderedSprite): Promise<HTMLCanvasElement> {
 }
 
 /**
+ * Paint the message-window bust ("miniface"): the level-0 顔領域 crop of
+ * the composed standing sprite, drawn 1:1 into `target`.
+ */
+export async function paintSpriteFace(
+  rendered: RenderedSprite,
+  target: HTMLCanvasElement,
+  isCurrent: () => boolean,
+): Promise<boolean> {
+  const source = await buildComposite(rendered);
+  if (!isCurrent()) return false;
+  const r = rendered.faceRect;
+  if (target.width !== r.width || target.height !== r.height) {
+    target.width = r.width;
+    target.height = r.height;
+  }
+  const ctx = target.getContext('2d');
+  if (!ctx) return false;
+  ctx.clearRect(0, 0, target.width, target.height);
+  // The composite page is trimmed (page.x/y is the trim origin in PSD
+  // canvas coords), so shift the marker rect into page-relative coords.
+  ctx.drawImage(
+    source,
+    r.left - rendered.page.x, r.top - rendered.page.y, r.width, r.height,
+    0, 0, r.width, r.height,
+  );
+  return true;
+}
+
+/**
  * Paint the body+face composite for `rendered` onto `target`. Resolves false
  * if the sprite changed / component went away before the bitmap was ready.
  */

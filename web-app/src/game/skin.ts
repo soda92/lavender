@@ -14,6 +14,9 @@ export const SKIN = {
   mesBase: uipsd('message01@ベース%base.png'),
   mesFrame: uipsd('message01@フレーム%layer.png'),
   mesName: uipsd('message01@名前%layer.png'),
+  // message01.csv: face mask layer at (0,400 205x200); its alpha channel is
+  // the soft-edge mask applied to the 顔領域 crop.
+  mesFaceMask: uipsd('message01@顔mask%layer.png'),
   // message00.csv: system button strip (0,580 800x20)
   sysBar: uipsd('message00@base%base.png'),
   // select.csv: choice rows (32,184 736x45)

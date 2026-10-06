@@ -270,6 +270,12 @@ export interface RenderedSprite {
   page: { x: number; y: number; w: number; h: number };
   body: RenderedSpritePart | null;
   face: RenderedSpritePart | null;
+  /**
+   * Message-window bust crop ("顔領域") in level-0 PSD canvas coords.
+   * Only meaningful together with a level:0 render — the marker exists
+   * on the level-0 page only.
+   */
+  faceRect: { left: number; top: number; width: number; height: number };
   /** Final placement offsets relative to the (center-x, baseline-y) anchor. */
   offsetX: number;
   offsetY: number;
@@ -306,6 +312,16 @@ export function renderCharacter(
   const levelKey = String(level);
   const layers = meta.levels[levelKey] || meta.levels['1'] || Object.values(meta.levels)[0];
   const canvas = meta.canvas[levelKey] || meta.canvas['1'] || [278, 961];
+
+  // Message-window bust area (exstand getFaceArea): a level-0 marker layer,
+  // preferring a dress-specific "<dress>顔領域" over the generic one.
+  const level0 = meta.levels['0'];
+  const faceMarker =
+    (spec.dress && level0?.find(l => l.name === `${spec.dress}顔領域`)) ||
+    level0?.find(l => l.name === '顔領域');
+  const faceRect = faceMarker
+    ? { left: faceMarker.left, top: faceMarker.top, width: faceMarker.width, height: faceMarker.height }
+    : { left: 0, top: 0, width: 205, height: 200 };
 
   const dressRow =
     meta.dresses.find(d => d.dress === spec.dress && (d.diff === spec.diff || !spec.diff)) ||
@@ -389,6 +405,7 @@ export function renderCharacter(
     page,
     body: toPage(body),
     face: toPage(face),
+    faceRect,
     offsetX,
     offsetY,
   };

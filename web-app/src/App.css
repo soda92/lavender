@@ -114,8 +114,16 @@ html, body, #root {
   z-index: 60;
   pointer-events: none;
 }
+.mes-chrome { position: absolute; inset: 0; }
 .mes-base { position: absolute; left: 0; top: 0; width: 800px; height: 201px; }
 .mes-frame { position: absolute; left: 7px; top: 46px; width: 785px; height: 131px; }
+.mes-face {
+  position: absolute;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
 .mes-name-plate { position: absolute; left: 0; top: 19px; width: 353px; height: 31px; }
 .mes-name-text {
   position: absolute;

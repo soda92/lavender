@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { envYOffset, mediaUrl, renderCharacter, timeDef } from '../game/metadata';
-import { paintSpriteComposite } from '../game/spriteComposite';
+import { paintSpriteComposite, paintSpriteFace } from '../game/spriteComposite';
 import { SKIN, SYS_BUTTONS } from '../game/skin';
 import { useT } from '../game/i18n';
 import type { StageState, CharState, DynLayer } from '../hooks/useKagRunner';
@@ -156,6 +156,43 @@ interface Props {
   runner: any;
 }
 
+/**
+ * Message-window bust ("miniface"): the engine crops the level-0 顔領域
+ * (205x200 at PSD 0,0) of the SPEAKING character's composed standing
+ * sprite — current costume and expression — and clips it through the
+ * soft-edge 顔mask. Only shown for a visible on-stage speaker.
+ */
+const MiniFace: React.FC<{ ch: CharState }> = ({ ch }) => {
+  const rendered = useMemo(
+    () => renderCharacter(ch.name, {
+      pose: ch.pose, dress: ch.dress, diff: ch.diff, face: ch.face, level: 0,
+    }),
+    [ch.name, ch.pose, ch.dress, ch.diff, ch.face],
+  );
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (!rendered?.body || !canvasRef.current) return;
+    let cancelled = false;
+    void paintSpriteFace(rendered, canvasRef.current, () => !cancelled);
+    return () => { cancelled = true; };
+  }, [rendered]);
+
+  if (!rendered?.body) return null;
+  const r = rendered.faceRect;
+  return (
+    <canvas
+      ref={canvasRef}
+      className="mes-face"
+      style={{
+        left: 0, top: 1, width: r.width, height: r.height,
+        WebkitMaskImage: `url(${SKIN.mesFaceMask})`,
+        maskImage: `url(${SKIN.mesFaceMask})`,
+      } as React.CSSProperties}
+    />
+  );
+};
+
 const SceneView: React.FC<{ stage: StageState }> = ({ stage }) => {
   const chars = Object.values(stage.chars as Record<string, CharState>).filter(c => c.visible);
   const layers = Object.values(stage.layers as Record<string, DynLayer>).filter(l => l.visible);
@@ -201,6 +238,16 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
   } = runner;
   const t = useT();
   const immerse = !!sf?.immerseMode;
+  // Message-window face: only when the speaker is a visible stand character.
+  const faceChar = !speaker ? null : (
+    Object.values(stage.chars as Record<string, CharState>)
+      .find(c => c.visible && c.name === speaker) || null
+  );
+  // Engine: whole frame opacity = sf.windowOpac/255 (default unset). The
+  // shipped base panel is only ~89% white; the default multiplier gives
+  // the semi-transparent reference look while the name plate keeps its
+  // own (near-solid) alpha.
+  const mesOpac = sf?.windowOpac != null ? sf.windowOpac / 255 : 0.9;
 
   const shownText = typewriterText || (isWaiting ? dialogueText : dialogueText);
 
@@ -304,11 +351,19 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
           </div>
         ) : (
           <div className="mes-window">
-            <img className="mes-base" src={SKIN.mesBase} alt="" draggable={false} />
-            <img className="mes-frame" src={SKIN.mesFrame} alt="" draggable={false} />
+            <div className="mes-chrome">
+              <img className="mes-base" src={SKIN.mesBase} alt="" draggable={false} style={{ opacity: mesOpac }} />
+              <img className="mes-frame" src={SKIN.mesFrame} alt="" draggable={false} />
+            </div>
+            {faceChar && <MiniFace ch={faceChar} />}
             {speaker && (
               <>
-                <img className="mes-name-plate" src={SKIN.mesName} alt="" draggable={false} />
+                <img
+                  className="mes-name-plate"
+                  src={SKIN.mesName}
+                  alt=""
+                  draggable={false}
+                />
                 <div className="mes-name-text">{speaker}</div>
               </>
             )}
