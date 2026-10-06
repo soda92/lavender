@@ -100,6 +100,8 @@ const dict = {
   'gallery.catRiko': { ja: 'リコ', en: 'Riko' },
   'gallery.catOther': { ja: 'その他', en: 'Other' },
   'gallery.variantsTitle': { ja: '{n} 枚の差分（クリックで切替）', en: '{n} variants (click to switch)' },
+  'gallery.variantsPartial': { ja: '{seen} / {n} 枚解放', en: '{seen} of {n} unlocked' },
+  'gallery.lockedFrame': { ja: '未解放のCG', en: 'Locked CG' },
   'gallery.prev': { ja: '前へ', en: 'Prev' },
   'gallery.next': { ja: '次へ', en: 'Next' },
   'gallery.page': { ja: 'ページ', en: 'Page' },

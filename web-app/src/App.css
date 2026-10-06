@@ -531,6 +531,11 @@ button.danger { border-color: #b4555f; background: #4d2830; }
   border: 1px solid #b3a1d4; color: #6f4fb0;
   pointer-events: none;
 }
+.cgmem-badge.partial {
+  min-width: 22px;
+  background: rgba(255,244,222,0.94);
+  border-color: #d9a95b; color: #9a6b14;
+}
 .cgmem-veil {
   position: absolute; right: 6px; top: 6px;
   width: 26px; height: 26px; line-height: 26px;
@@ -612,6 +617,18 @@ button.danger { border-color: #b4555f; background: #4d2830; }
   max-width: none;
   pointer-events: none;
 }
+.cg-viewer .cg-zoom-locked {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px;
+  background: radial-gradient(circle at center, #241a3d 0%, #120d24 72%);
+  color: #e9e2f5; cursor: pointer; user-select: none;
+}
+.cg-viewer .cg-zoom-locked .q {
+  font-family: "Yu Mincho", "Hiragino Mincho ProN", "MS Mincho", serif;
+  font-size: 52px; letter-spacing: 12px; opacity: 0.85;
+}
+.cg-viewer .cg-zoom-locked .sub { font-size: 13px; letter-spacing: 4px; opacity: 0.6; }
 .cg-viewer-x {
   position: absolute; top: 10px; right: 14px;
   background: none; border: none;
@@ -648,6 +665,7 @@ button.danger { border-color: #b4555f; background: #4d2830; }
 }
 .cg-viewer-bar button:disabled { opacity: 0.35; cursor: default; }
 .cg-viewer-bar button:not(:disabled):hover { background: rgba(157,123,216,0.35); }
+.cg-viewer-bar span.locked { color: #e6b866; }
 
 /* ---------- sound mode (sound.csv paper skin) ---------- */
 .cgmem-sheet { position: absolute; pointer-events: none; }

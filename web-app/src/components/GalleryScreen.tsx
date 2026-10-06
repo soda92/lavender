@@ -109,8 +109,12 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack, audio, initialViewMode = '
   const currentCount = countFor(tab);
 
   const openTile = (tile: CgTile) => {
-    const variants = tile.variants.filter(isVariantSeen);
-    if (variants.length) setViewer({ tile, variants, idx: 0 });
+    if (!tileUnlocked(tile)) return;
+    // Keep ALL variant slots in the viewer: unseen positions render as a
+    // locked placeholder, so a 4-variant tile with 1 seen shows 1/4 rather
+    // than a one-frame viewer that closes on the next click.
+    const firstSeen = tile.variants.findIndex(isVariantSeen);
+    setViewer({ tile, variants: tile.variants, idx: Math.max(0, firstSeen) });
   };
   const stepViewer = (d: number) => setViewer(v => {
     if (!v) return v;
@@ -134,6 +138,7 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack, audio, initialViewMode = '
   }, [viewer]);
 
   const cur = viewer?.variants[viewer.idx];
+  const curLocked = cur ? !isVariantSeen(cur) : false;
 
   // Pager: engine shows four numbered slots at a time.
   const groupSize = CG_MEMORY.pager.groupSize;
@@ -268,6 +273,8 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack, audio, initialViewMode = '
             const tile = pageSlice[i] as CgTile | undefined;
             if (!tile) return null;
             const open = tileUnlocked(tile);
+            const seenCount = tile.variants.filter(isVariantSeen).length;
+            const partial = tile.variants.length > 1 && seenCount < tile.variants.length;
             return (
               <button
                 key={tile.id}
@@ -281,8 +288,13 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack, audio, initialViewMode = '
                   <img className="cgmem-thumb" src={tile.thumb}
                     style={pos(CG_MEMORY.cg.thumb)} alt={tile.id} loading="lazy" draggable={false} />
                   {tile.variants.length > 1 && (
-                    <span className="cgmem-badge" title={t('gallery.variantsTitle', { n: tile.variants.length })}>
-                      {tile.variants.length}
+                    <span
+                      className={`cgmem-badge${partial ? ' partial' : ''}`}
+                      title={partial
+                        ? t('gallery.variantsPartial', { seen: seenCount, n: tile.variants.length })
+                        : t('gallery.variantsTitle', { n: tile.variants.length })}
+                    >
+                      {partial ? `${seenCount}/${tile.variants.length}` : tile.variants.length}
                     </span>
                   )}
                 </> : (
@@ -377,16 +389,27 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack, audio, initialViewMode = '
             <button className="cg-viewer-nav next" onClick={e => { e.stopPropagation(); stepViewer(1); }}>›</button>
           )}
           <div className="cg-viewer-stage">
-            <img className="cg-zoom" src={cur.url} alt={cur.stem} draggable={false} />
-            {cur.overlay && (
-              <img className="cg-zoom-overlay" src={overlayUrl(cur.overlay)} alt="" draggable={false} />
-            )}
+            {curLocked ? (
+              <div className="cg-zoom-locked">
+                <span className="q">？？？？</span>
+                <span className="sub">{t('gallery.lockedFrame')}</span>
+              </div>
+            ) : (<>
+              <img className="cg-zoom" src={cur.url} alt={cur.stem} draggable={false} />
+              {cur.overlay && (
+                <img className="cg-zoom-overlay" src={overlayUrl(cur.overlay)} alt="" draggable={false} />
+              )}
+            </>)}
           </div>
           {viewer.variants.length > 1 && (
             <div className="cg-viewer-bar" onClick={e => e.stopPropagation()}>
               <button onClick={() => stepViewer(-1)} disabled={viewer.idx === 0}>{t('gallery.prev')}</button>
-              <span>{viewer.idx + 1} / {viewer.variants.length}</span>
-              <button onClick={() => stepViewer(1)}>{t('gallery.next')}</button>
+              <span className={curLocked ? 'locked' : ''}>
+                {curLocked && '🔒 '}{viewer.idx + 1} / {viewer.variants.length}
+              </span>
+              <button onClick={() => stepViewer(1)}>
+                {viewer.idx === viewer.variants.length - 1 ? t('gallery.endScene') : t('gallery.next')}
+              </button>
             </div>
           )}
         </div>
