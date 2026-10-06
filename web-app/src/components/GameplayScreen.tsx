@@ -4,7 +4,7 @@ import { paintSpriteComposite, paintSpriteFace } from '../game/spriteComposite';
 import { SKIN, SKIN2, SYS_BUTTONS } from '../game/skin';
 import { useT } from '../game/i18n';
 import { useDebugTimeScale } from '../game/debugTiming';
-import type { StageState, CharState, DynLayer } from '../hooks/useKagRunner';
+import type { StageState, CharState, DynLayer, LayerPosTrack, LayerOpTrack } from '../hooks/useKagRunner';
 
 const STAGE_W = 800;
 const STAGE_H = 600;
@@ -202,12 +202,59 @@ const CharacterView: React.FC<{ ch: CharState; instant?: boolean }> = ({ ch, ins
 };
 
 const LayerView: React.FC<{ layer: DynLayer }> = ({ layer }) => {
+  const ref = useRef<HTMLImageElement>(null);
+  const seenNonces = useRef<Set<number>>(new Set());
+  const liveAnims = useRef<Map<number, Animation>>(new Map());
+  const timeScale = useDebugTimeScale();
+
+  // Scripted pans/fades (time= on ev/newlay/named-layer tags): independent
+  // WAAPI tracks for position and opacity, so a fade and a pan issued on
+  // back-to-back tags overlap and a later no-time retarget must not restart
+  // them. Model values already hold END states: fill:'forwards' is released
+  // on finish with no visual pop.
+  const startTrack = (t: LayerPosTrack | LayerOpTrack, kind: 'pos' | 'op') => {
+    const el = ref.current;
+    if (!el || seenNonces.current.has(t.nonce)) return;
+    seenNonces.current.add(t.nonce);
+    const anim = kind === 'pos'
+      ? el.animate(
+          [
+            { transform: `translate(-50%, -50%) translate(${(t as LayerPosTrack).from.x - (t as LayerPosTrack).to.x}px, ${(t as LayerPosTrack).from.y - (t as LayerPosTrack).to.y}px)` },
+            { transform: 'translate(-50%, -50%)' },
+          ],
+          { duration: t.ms * timeScale, easing: t.easing, fill: 'forwards' },
+        )
+      : el.animate(
+          [{ opacity: (t as LayerOpTrack).from / 255 }, { opacity: (t as LayerOpTrack).to / 255 }],
+          { duration: t.ms * timeScale, easing: t.easing, fill: 'forwards' },
+        );
+    anim.onfinish = () => { anim.cancel(); liveAnims.current.delete(t.nonce); };
+    liveAnims.current.set(t.nonce, anim);
+  };
+  useEffect(() => { if (layer.anim?.pos) startTrack(layer.anim.pos, 'pos'); }, [layer.anim?.pos]);
+  useEffect(() => { if (layer.anim?.op) startTrack(layer.anim.op, 'op'); }, [layer.anim?.op]);
+
+  // Cut (file swap / no-time retarget / seek): drop all in-flight tweens.
+  useEffect(() => {
+    if (layer.anim) return;
+    liveAnims.current.forEach(a => a.cancel());
+    liveAnims.current.clear();
+    seenNonces.current.clear();
+  }, [layer.anim]);
+
+  // Unmount cancels everything.
+  useEffect(() => () => {
+    liveAnims.current.forEach(a => a.cancel());
+    liveAnims.current.clear();
+  }, []);
+
   if (!layer.file) return null;
   const url = mediaUrl(layer.file);
   if (!url) return null;
   const positioned = layer.xpos != null || layer.ypos != null;
   return (
     <img
+      ref={ref}
       src={url}
       alt=""
       draggable={false}

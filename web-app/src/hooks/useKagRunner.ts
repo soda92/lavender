@@ -36,6 +36,24 @@ export interface CharState {
   exitAnim?: { dx: number; ms: number; nonce: number };
 }
 
+export interface LayerAnimTrack {
+  nonce: number;
+  ms: number;
+  easing: string;
+}
+export interface LayerPosTrack extends LayerAnimTrack {
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+}
+export interface LayerOpTrack extends LayerAnimTrack {
+  from: number;
+  to: number;
+}
+export interface LayerAnim {
+  pos?: LayerPosTrack;
+  op?: LayerOpTrack;
+}
+
 export interface DynLayer {
   name: string;
   file?: string;
@@ -45,6 +63,8 @@ export interface DynLayer {
   xpos: number | null;
   ypos: number | null;
   opacity: number;
+  /** Scripted time= tweens of position/opacity (large-art pans/fades). */
+  anim?: LayerAnim;
 }
 
 export interface EnvAdjust {
@@ -863,6 +883,7 @@ export function useKagRunner(audio: {
   };
 
   const applyLayerArgs = (ly: DynLayer, args: Record<string, any>, argv: string[]) => {
+    const prev = { x: ly.xpos, y: ly.ypos, opacity: ly.opacity };
     if (args.file) ly.file = args.file;
     if (args.level != null) ly.level = parseInt(String(args.level), 10) || ly.level;
     if (args.xpos != null) ly.xpos = parseInt(String(args.xpos), 10);
@@ -873,6 +894,55 @@ export function useKagRunner(audio: {
     if (argv.includes('front')) ly.front = true;
     if (argv.includes('back')) ly.front = false;
     if (!ly.file && args.storage) ly.file = args.storage;
+
+    // Large-art pans/fades carry time=: tween the changed properties
+    // ([ev opacity=255 time=1500], [scrl ypos=150 time=1000 accel=-1]).
+    // Zero duration while skipping/seeking; a file swap or a new position
+    // without time cuts and cancels any running pan. Separate tracks let a
+    // fade and a pan issued back-to-back overlap (same layer, two WAAPI anims).
+    const instant = fastRef.current || seekRef.current != null || silentRef.current;
+    const msArg = args.time != null && args.time !== '' ? parseInt(String(args.time), 10) : 0;
+    const hasPos = args.xpos != null || args.ypos != null;
+    const hasOp = args.opacity != null;
+    if (!instant && msArg > 0 && (hasPos || hasOp)) {
+      const drawFactor = Math.max(0, Math.min(2, 2 - (sfRef.current.drawPos ?? 120) / 120 * 1));
+      const ms = Math.round(debugMs(msArg) * drawFactor);
+      const accel = parseInt(String(args.accel ?? '0'), 10) || 0;
+      const easing = accel < 0 ? 'ease-out' : accel > 0 ? 'ease-in' : 'linear';
+      const tracks: LayerAnim = hasPos
+        ? { ...ly.anim, pos: {
+            nonce: ++animNonceRef.current, ms, easing,
+            from: { x: prev.x ?? 400, y: prev.y ?? 300 },
+            to: { x: ly.xpos ?? 400, y: ly.ypos ?? 300 },
+          } }
+        : { ...ly.anim };
+      if (hasOp) tracks.op = {
+        nonce: ++animNonceRef.current, ms, easing,
+        from: prev.opacity, to: ly.opacity,
+      };
+      ly.anim = tracks;
+    } else if (args.file || hasPos || hasOp) {
+      delete ly.anim;
+    }
+  };
+
+  // Block the script on sync pans: `sync` waits for the full tween,
+  // `transwait=` caps the wait (motion continues under the next lines);
+  // nowait/nosync return immediately.
+  const waitForLayerMotion = async (ly: DynLayer, args: Record<string, any>, argv: string[]) => {
+    const skipping = fastRef.current || seekRef.current != null || silentRef.current;
+    if (skipping) return;
+    const msArg = args.time != null && args.time !== '' ? parseInt(String(args.time), 10) : 0;
+    if (!(msArg > 0)) return;
+    const drawFactor = Math.max(0, Math.min(2, 2 - (sfRef.current.drawPos ?? 120) / 120 * 1));
+    const ms = Math.round(debugMs(msArg) * drawFactor);
+    let wait = 0;
+    if (argv.includes('sync')) wait = ms;
+    else if (args.transwait != null && args.transwait !== '' && !argv.includes('nowait')
+             && !argv.includes('nosync')) {
+      wait = Math.min(ms, parseInt(String(args.transwait), 10) || 0);
+    }
+    if (wait > 0) await sleep(wait);
   };
 
   const isStageTag = (n: string) => !!envinitRef.current?.stages[n];
@@ -1065,6 +1135,7 @@ export function useKagRunner(audio: {
       else if (argv.includes('show')) ly.visible = true;
       if (ly.file && /^ev/.test(ly.file)) markCgSeen(ly.file);
       commitStage();
+      await waitForLayerMotion(ly, args, argv);
       return 'continue';
     }
     if (name === 'newlay' || name === 'newlayer' || name === 'new') {
@@ -1075,6 +1146,7 @@ export function useKagRunner(audio: {
         if (args.opacity === '0') ly.visible = ly.visible && argv.includes('show');
         if (ly.file && /^ev/.test(ly.file)) markCgSeen(ly.file);
         commitStage();
+        await waitForLayerMotion(ly, args, argv);
       }
       return 'continue';
     }
@@ -1100,11 +1172,14 @@ export function useKagRunner(audio: {
       if (!argv.includes('hide') && args.visible !== 'false') ly.visible = true;
       markCgSeen(name);
       commitStage();
+      await waitForLayerMotion(ly, args, argv);
       return 'continue';
     }
     if (world.layers[name]) {
-      applyLayerArgs(world.layers[name], args, argv);
+      const ly = world.layers[name];
+      applyLayerArgs(ly, args, argv);
       commitStage();
+      await waitForLayerMotion(ly, args, argv);
       return 'continue';
     }
 
@@ -1812,6 +1887,7 @@ export function useKagRunner(audio: {
       delete c.exitAnim;
       delete c.leaving;
     }
+    for (const l of Object.values(stage.layers)) delete l.anim;
     return {
       currentScenario: scenarioRef.current,
       pointer: ptrRef.current,
@@ -1901,6 +1977,7 @@ export function useKagRunner(audio: {
         delete c.exitAnim;
         delete c.leaving;
       }
+      for (const l of Object.values(restored.layers)) delete l.anim;
       stageRef.current = restored;
       commitStage();
     }
