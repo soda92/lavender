@@ -40,14 +40,14 @@ export const SKIN2 = {
 
 /**
  * Design cursor art. PNG renders of the engine's cur_normal/cur_over
- * emitted by the extractor with the hotspot moved to the sprig's stem
- * tip (30,30). PNG is used rather than .cur because browsers honor the
+ * emitted by the extractor with the hotspot moved to the center of the
+ * sprig (16,16). PNG is used rather than .cur because browsers honor the
  * explicit CSS hotspot coordinates reliably across platforms.
  */
 export const CURSOR_DESIGN = '/image/cur_normal.png';
 /** Hover cursor for clickable UI (choices, buttons). */
 export const CURSOR_OVER = '/image/cur_over.png';
-export const CURSOR_HOTSPOT = '30 30';
+export const CURSOR_HOTSPOT = '16 16';
 
 // ---------------------------------------------------------------------------
 // dialog.csv: engine Yes/No confirmation popup (309x154 at 245,223)

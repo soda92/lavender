@@ -176,7 +176,7 @@ export default function App() {
         style={{
           width: 800, height: 600,
           transform: `scale(${scale})`, marginRight: stageShift,
-          // PNG cursors with explicit hotspot at the sprig's stem tip.
+          // PNG cursors with explicit hotspot at the sprig's center.
           '--cur-normal': sf.designCursor === false
             ? 'default'
             : `url(${CURSOR_DESIGN}) ${CURSOR_HOTSPOT}, default`,

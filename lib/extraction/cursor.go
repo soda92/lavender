@@ -15,15 +15,15 @@ import (
 // cursorHotspots overrides the embedded click hotspot of engine UI cursors.
 // The shipped cur_normal/cur_over are 32x32 lavender sprigs running from the
 // top-left to the bottom-right with hotspot (0,0), so the artwork overlaps a
-// control ~30px before the click point actually enters it. Moving the
-// hotspot to the stem tip makes the art extend up-left of the activation
-// point (like a standard arrow), so hover flips when the visible tip lands.
+// control ~30px before the click point actually enters it. The hotspot is
+// moved to the center of the sprig (16,16), so the motif blooms around the
+// activation point instead of sweeping in from the corner.
 // Browsers are inconsistent about reading the hotspot embedded in .cur
 // files, so the frontend uses a PNG sibling with the hotspot given
 // explicitly in CSS; the .cur is patched as well for fidelity/tooling.
 var cursorHotspots = map[string][2]uint16{
-	"cur_normal.cur": {30, 30},
-	"cur_over.cur":   {30, 30},
+	"cur_normal.cur": {16, 16},
+	"cur_over.cur":   {16, 16},
 }
 
 // processCursors patches the hotspot of every known .cur file under root
