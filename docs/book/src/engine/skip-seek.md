@@ -42,6 +42,15 @@ straight to the instruction:
 6. `finishSeek()` clears the flags, reveals any open trans block as a cut,
    commits and waits for the next click.
 
+Because replay never clicks, the fresh-message flag the click path normally
+sets is derived from the skipped boundaries instead
+(`game/pageBoundary.ts`, `boundaryStartsFresh`): a non-inline `wait_click`
+or a `line_feed` not immediately followed by `wait_click` starts a fresh
+message; an inline `[*]` split keeps the page open and appends. A fresh
+text without a `【name】` prefix is narration, so it **clears the retained
+speaker and hides the message-window bust**, and replaces (never appends
+to) the shown text.
+
 Compiled **instruction indices** are the seek currency; they differ from
 raw `.ks` line numbers (macros expand). The hash breadcrumb shows the
 compiled pointer.

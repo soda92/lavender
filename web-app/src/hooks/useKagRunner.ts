@@ -19,6 +19,7 @@ import {
 import type { EnvInit, CharDisp } from '../game/metadata';
 export type { CharDisp } from '../game/metadata';
 import { debugMs } from '../game/debugTiming';
+import { boundaryStartsFresh } from '../game/pageBoundary';
 
 // ---------------------------------------------------------------------------
 // World state
@@ -1598,7 +1599,16 @@ export function useKagRunner(audio: {
           }
           ptrRef.current++; continue;
         }
-        if (inst.type === 'line_feed') { ptrRef.current++; continue; }
+        if (inst.type === 'line_feed') {
+          ptrRef.current++;
+          // Silent replay never clicks through pages: derive the fresh-message
+          // flag here so narration after a spoken line clears the speaker and
+          // the message-window bust.
+          if (seekRef.current != null) {
+            freshLineRef.current = boundaryStartsFresh(dataRef.current!, ptrRef.current, 'line_feed');
+          }
+          continue;
+        }
         if (inst.type === 'page_break' || inst.type === 'clear_text') {
           freshLineRef.current = true;
           ptrRef.current++;
@@ -1616,7 +1626,7 @@ export function useKagRunner(audio: {
               textVisibleRef.current = true;
               setTextVisible(true);
             }
-            const next = mm ? mm[2] : dialogueRef.current + raw;
+            const next = mm ? mm[2] : freshLineRef.current ? raw : dialogueRef.current + raw;
             dialogueRef.current = next;
             setDialogueText(next);
             setTypewriterText(next);
@@ -1692,13 +1702,19 @@ export function useKagRunner(audio: {
           break;
         }
         if (inst.type === 'wait_click') {
-          freshLineRef.current = false;
           ptrRef.current++;
           setPointer(ptrRef.current);
+          if (seekRef.current != null) {
+            // Non-inline waits end a message; inline [*] keeps the page open.
+            freshLineRef.current = boundaryStartsFresh(
+              dataRef.current!, ptrRef.current, 'wait_click', inst.inline,
+            );
+            continue;
+          }
+          freshLineRef.current = false;
           // Mid-line [*]: the preceding text node already provided the
           // click pause — continue on the SAME page without another wait.
           if (inst.inline) continue;
-          if (seekRef.current != null) continue;
           waitingRef.current = true;
           setIsWaiting(true);
           break;
