@@ -226,7 +226,7 @@ html, body, #root {
   font-family: inherit;
   font-size: 12px;
   letter-spacing: 0.5px;
-  cursor: var(--cur-over, pointer);
+  cursor: pointer;
 }
 .sys-btn.kind-glyph { font-size: 10px; letter-spacing: -1px; }
 .sys-btn.kind-voice svg { display: block; }
