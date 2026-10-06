@@ -13,7 +13,7 @@ const Hit: React.FC<{
   x: number; y: number; w: number; h: number;
   onClick: () => void; onHover?: (v: boolean) => void;
   cursor?: string; title?: string;
-}> = ({ x, y, w, h, onClick, onHover, cursor = 'pointer', title }) => (
+}> = ({ x, y, w, h, onClick, onHover, cursor = 'var(--cur-over, pointer)', title }) => (
   <button
     className="cfg-hit"
     style={{ position: 'absolute', left: x, top: y, width: w, height: h, cursor }}
@@ -64,7 +64,7 @@ const SkinSlider: React.FC<{
       <div
         ref={trackRef}
         className="cfg-slider-track"
-        style={{ position: 'absolute', left: x, top: y - 7, width: w, height: 22, cursor: 'pointer' }}
+        style={{ position: 'absolute', left: x, top: y - 7, width: w, height: 22, cursor: 'var(--cur-over, pointer)' }}
         onPointerDown={e => {
           dragRef.current = true;
           setFromClient(e.clientX);
@@ -321,7 +321,7 @@ const SoundPage: React.FC<{ runner: any }> = ({ runner }) => {
               top: fy + CFG_SOUND.smallKnob.dy - 8,
               width: CFG_SOUND.smallKnob.trackW, height: 22,
               opacity: muted ? 0.4 : 1, pointerEvents: muted ? 'none' : 'auto',
-              cursor: 'pointer',
+              cursor: 'var(--cur-over, pointer)',
             }}
               onPointerDown={e => {
                 const el = e.currentTarget;

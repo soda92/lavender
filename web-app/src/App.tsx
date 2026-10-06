@@ -7,7 +7,7 @@ import TitleScreen from './components/TitleScreen';
 import SidePanel, { type SideTab } from './components/SidePanel';
 import ConfigOverlay from './components/ConfigOverlay';
 import SkinDialog from './components/SkinDialog';
-import { CURSOR_DESIGN } from './game/skin';
+import { CURSOR_DESIGN, CURSOR_OVER } from './game/skin';
 import { setDebugTimeScale, getDebugTimeScale } from './game/debugTiming';
 import { captureTransition, downloadLastCapture, type CaptureOptions } from './game/transitionCapture';
 import GalleryScreen from './components/GalleryScreen';
@@ -171,10 +171,14 @@ export default function App() {
         style={{
           width: 800, height: 600,
           transform: `scale(${scale})`, marginRight: stageShift,
-          cursor: sf.designCursor === false
+          '--cur-normal': sf.designCursor === false
             ? 'default'
             : `url(${CURSOR_DESIGN}) 0 0, default`,
-        }}
+          '--cur-over': sf.designCursor === false
+            ? 'pointer'
+            : `url(${CURSOR_OVER}) 0 0, pointer`,
+          cursor: 'var(--cur-normal)',
+        } as CSSProperties}
       >
         {runner.gameState === 'TITLE' && (
           <TitleScreen

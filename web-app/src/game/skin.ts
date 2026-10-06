@@ -40,6 +40,8 @@ export const SKIN2 = {
 
 /** Original OS cursor art (design vs system cursor toggle). */
 export const CURSOR_DESIGN = '/image/cur_normal.cur';
+/** Hover cursor for clickable UI (choices, buttons). */
+export const CURSOR_OVER = '/image/cur_over.cur';
 
 // ---------------------------------------------------------------------------
 // dialog.csv: engine Yes/No confirmation popup (309x154 at 245,223)

@@ -58,7 +58,7 @@ const TitleScreen: React.FC<Props> = ({
         <button
           key={m.id}
           className="title-menu-btn"
-          style={{ top: ROW_TOPS[i], cursor: m.id === 'load' && !hasAutosave ? 'default' : 'pointer' }}
+          style={{ top: ROW_TOPS[i], cursor: m.id === 'load' && !hasAutosave ? 'var(--cur-normal, default)' : 'var(--cur-over, pointer)' }}
           onMouseEnter={() => setHover(i)}
           onMouseLeave={() => setHover(null)}
           onClick={() => onPick(m.id)}
