@@ -27,10 +27,18 @@ function bgFilter(stage: StageState): string {
 
 function bgTransform(stage: StageState): string {
   const eff = stage.bgEffect || {};
-  const z = eff.zoom ? eff.zoom / 100 : 1;
-  const x = eff.xpos || 0;
-  const y = eff.ypos || 0;
-  return `translate(${x}px, ${y}px) scale(${z})`;
+  // Engine world.tjs recalcPosition for the environment layer:
+  //   left = originx + (((xpos - camerax) * z + xoff) * camerazoom) - shiftx
+  // where z = envinit.bglevelz / 100 = 0.3 (background camera parallax).
+  // The bitmap is center-registered and the layer zoom scales about the
+  // stage center, so here the 800x600 element uses object-fit:none
+  // (native-size centered art) and transform-origin:center.
+  const P = 0.3;
+  const cz = eff.camerazoom ? eff.camerazoom / 100 : 1;
+  const s = (eff.zoom ? eff.zoom / 100 : 1) * cz;
+  const x = ((eff.xpos || 0) - (eff.camerax || 0)) * P * cz - (eff.shiftx || 0);
+  const y = ((eff.ypos || 0) - (eff.cameray || 0)) * P * cz - (eff.shifty || 0);
+  return `translate(${x}px, ${y}px) scale(${s})`;
 }
 
 // Engine charDispTrans / charTrans: per-layer 300ms crossfade for
@@ -302,16 +310,22 @@ const SceneView: React.FC<{ stage: StageState; instant?: boolean }> = ({ stage, 
     <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
       {/* background */}
       {bgUrl && (
-        <img
-          src={bgUrl}
-          alt=""
-          draggable={false}
-          style={{
-            position: 'absolute', inset: 0, width: '100%', height: '100%',
-            objectFit: 'cover', filter: bgFilter(stage),
-            transform: bgTransform(stage), zIndex: 0,
-          }}
-        />
+        // Flex wrapper center-registers the native-size bitmap (afx/afy=center);
+        // the camera transform then pans/scales it about the stage center.
+        <div style={{ position: 'absolute', inset: 0, zIndex: 0, overflow: 'hidden',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      pointerEvents: 'none' }}>
+          <img
+            src={bgUrl}
+            alt=""
+            draggable={false}
+            style={{
+              width: 'auto', height: 'auto', flex: 'none',
+              filter: bgFilter(stage),
+              transform: bgTransform(stage), transformOrigin: 'center',
+            }}
+          />
+        </div>
       )}
 
       {/* back layers */}

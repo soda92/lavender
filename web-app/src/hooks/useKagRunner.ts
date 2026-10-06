@@ -54,12 +54,20 @@ export interface EnvAdjust {
 }
 
 export interface BgEffect {
-  zoom?: number;   // percent
+  zoom?: number;      // layer zoom percent (100 = native 1:1)
   xpos?: number;
   ypos?: number;
+  camerax?: number;   // global camera offsets (subtracted from xpos/ypos)
+  cameray?: number;
+  camerazoom?: number;
+  shiftx?: number;
+  shifty?: number;
   blur?: number;
   brightness?: number;
 }
+
+// Camera attribute keys accepted on stage tags and bare [bg] tags.
+const BG_CAM_KEYS = ['zoom', 'xpos', 'ypos', 'camerax', 'cameray', 'camerazoom', 'shiftx', 'shifty', 'blur', 'brightness'] as const;
 
 export interface StageState {
   bg: { stem: string; time: string } | null;
@@ -954,7 +962,13 @@ export function useKagRunner(audio: {
       for (const t of argv) if (envinitRef.current?.times[t]) time = t;
       if (args.stime && envinitRef.current?.times[args.stime]) time = args.stime;
       world.bg = { stem: stageStem(name, time), time };
-      world.bgEffect = {}; // a new stage resets the camera
+      // A new stage resets the camera, but the stage tag itself may carry
+      // initial camera values (e.g. [通学路 昼 xpos=-150 ypos=-150]).
+      const eff: BgEffect = {};
+      for (const k of BG_CAM_KEYS) {
+        if (args[k] != null && args[k] !== '') eff[k] = parseFloat(String(args[k]));
+      }
+      world.bgEffect = eff;
       world.bgHidden = false;
       markBgSeen(world.bg.stem);
       commitStage();
@@ -1000,12 +1014,16 @@ export function useKagRunner(audio: {
       const stem = args.file || args.storage || args.str;
       if (stem) {
         world.bg = { stem: String(stem).replace(/\.\w+$/, ''), time: world.bg?.time || '昼' };
-        world.bgEffect = {};
+        const eff: BgEffect = {};
+        for (const k of BG_CAM_KEYS) {
+          if (args[k] != null && args[k] !== '') eff[k] = parseFloat(String(args[k]));
+        }
+        world.bgEffect = eff;
         world.bgHidden = false;
       } else {
         // Background camera / filter control (never sets an image).
-        const eff: BgEffect = { ...world.bgEffect };
-        for (const k of ['zoom', 'xpos', 'ypos', 'blur', 'brightness'] as const) {
+        const eff: BgEffect = argv.includes('resetcamera') ? {} : { ...world.bgEffect };
+        for (const k of BG_CAM_KEYS) {
           if (args[k] != null && args[k] !== '') eff[k] = parseFloat(String(args[k]));
         }
         world.bgEffect = eff;
