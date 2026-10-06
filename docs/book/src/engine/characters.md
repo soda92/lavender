@@ -9,13 +9,32 @@ A rendered character is a **body** PNG plus a **face** PNG chosen from
 manifests (`characters.json`):
 
 - tag tokens select costume (dress), pose, diff (variant), face expression;
-- `renderCharacter()` resolves the exact part list, with **cross-pose face
-  fallback** when the current pose lacks an expression;
+- `renderCharacter()` resolves the exact part list. When the requested diff
+  or face is **not declared for the requested pose**, the whole stand
+  switches to the first pose (charinit.csv order) that declares it — see
+  [stand resolution](#stand-resolution-diff--face-pose-switching);
 - `spriteComposite.ts` paints body+face to a canvas.
 
 **顔分離型** (separate-face) stands use `operateRect` and `charlevel.csv`
 anchors to register the face layer at the correct per-level offset
 (`charlevel.csv` columns are level0..3 x/y adjustments, not stage slots).
+
+## Stand resolution (diff & face pose switching)
+
+`exstand.tjs` applies a character tag in dress→pose→diff→face order. A diff
+or face missing from the current pose does not borrow a layer: the ENTIRE
+stand changes to the first pose (charinit.csv enumeration) declaring it for
+the current dress; `checkDiffFace()` finally defaults an invalid/omitted
+face to `faceList[0]`. Pure implementation: `game/standResolve.ts`
+(`resolveStand`), table-tested in `standResolve.test.ts`, consumed by
+`renderCharacter` for every level.
+
+Postmortem of the bug this replaced: the port used to graft another pose's
+face plate onto the requested pose's body ("cross-pose fallback"). Plates
+are opaque 102×83-ish face tiles in per-pose coordinates and bodies have a
+transparent face hole, so e.g. はるか ポーズＢ+すまし painted ポーズＡ's plate
+at Ａ's coords over Ｂ — an opaque rectangle over the head (lave43/73).
+
 
 ## Dispositions (KAGEnvImage)
 
@@ -81,13 +100,17 @@ the on-stage page (`envinit.tjs`: `faceLevelName = 0`; `exstand.tjs`
 plate are composited on that full, untrimmed canvas at their raw manifest
 coordinates and the marker rect indexes it 1:1. Two consequences:
 
-- Per-pose face coordinates differ, so the cross-pose expression fallback
-  used on the shared full-stand frames (levels 1/2) is **invalid at level 0**;
-  `exstand setFace`/`getFaceInfo` are per-stand anyway. When a pose ships no
-  plate for the requested expression (e.g. レイカ ポーズＣ 防具 only ships
-  01–04/17–20; `すねる` is pose-B-only), the bust paints **body only**, and
-  the body's transparent face hole lets the message01 `フレーム%layer.png`
-  decorative tile panel show through — exactly the engine result.
+- Per-pose face coordinates differ and each body sheet has a **transparent
+  rectangular face hole**, so a face plate can never be transplanted from
+  another pose. `exstand.tjs` `setDiff`/`setFace` instead switch the **whole
+  stand** (`currentDiffNameMap`/`currentFaceNameMap`): e.g. はるか ポーズＢ
+  +すまし silently renders ポーズＡ (the first pose declaring すまし for that
+  dress), body included — at every level, including the level-0 bust.
+  `checkDiffFace()` then defaults an invalid/omitted expression to the
+  stand's first declared face (`faceList[0]`) so the hole is never empty.
+  Corpus audit: 13 face switches, 0 diff switches (scripts pair diffs with
+  compatible poses); the message01 `フレーム%layer.png` decorative tile can
+  only show through if a stand genuinely has no declared faces at all.
 - The on-stage union-bounds trim (page `x/y`) must never be applied to the
   bust source; doing so shifts every bust crop up-left by the trim origin.
 
