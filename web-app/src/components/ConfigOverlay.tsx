@@ -1,50 +1,31 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  CFG_PAGES, CFG_CHROME, CFG_SYSTEM, CFG_SOUND, CFG_DEFAULTS,
-  cfgUrl, type CfgPage,
-} from '../game/skin';
+import { CFG_DEFAULTS, CFG_VOICE_CHARS, cfgSoundUrl } from '../game/skin';
+import { useI18n, type TKey } from '../game/i18n';
 
 interface Props {
   runner: any;
 }
 
-/** Absolute-positioned transparent hit area in stage coordinates. */
-const Hit: React.FC<{
-  x: number; y: number; w: number; h: number;
-  onClick: () => void; onHover?: (v: boolean) => void;
-  cursor?: string; title?: string;
-}> = ({ x, y, w, h, onClick, onHover, cursor = 'var(--cur-over, pointer)', title }) => (
-  <button
-    className="cfg-hit"
-    style={{ position: 'absolute', left: x, top: y, width: w, height: h, cursor }}
-    title={title}
-    onClick={e => { e.stopPropagation(); e.currentTarget.blur(); onClick(); }}
-    onMouseEnter={onHover ? () => onHover(true) : undefined}
-    onMouseLeave={onHover ? () => onHover(false) : undefined}
-  />
-);
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
-/**
- * Engine slider: a baked track drawn on the sheet plus a draggable knob
- * (nsld 31x8 / vsld 20x6). Knob CENTER runs along the track; position is
- * normalized 0..max.
- */
-const SkinSlider: React.FC<{
-  x: number; y: number; w: number;
-  knobUrl: string; knobW: number; knobH: number;
-  value: number; max?: number; onChange: (v: number) => void;
-}> = ({ x, y, w, knobUrl, knobW, knobH, value, max = 255, onChange }) => {
+// ---------------------------------------------------------------------------
+// Widgets
+// ---------------------------------------------------------------------------
+
+/** CSS slider: track + fill + round knob, same drag semantics as the engine. */
+const Slider: React.FC<{
+  value: number; max?: number; disabled?: boolean;
+  onChange: (v: number) => void;
+}> = ({ value, max = 255, disabled, onChange }) => {
   const trackRef = useRef<HTMLDivElement>(null);
-  const [hover, setHover] = useState(false);
   const dragRef = useRef(false);
+  const ratio = clamp01(value / max);
 
-  const ratio = Math.max(0, Math.min(1, value / max));
   const setFromClient = useCallback((clientX: number) => {
     const el = trackRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    const p = (clientX - r.left) / r.width;
-    onChange(Math.round(Math.max(0, Math.min(1, p)) * max));
+    onChange(Math.round(clamp01((clientX - r.left) / r.width) * max));
   }, [max, onChange]);
 
   useEffect(() => {
@@ -59,314 +40,308 @@ const SkinSlider: React.FC<{
   }, [setFromClient]);
 
   return (
-    <>
-      {/* invisible full-length interaction track */}
+    <div className={`cfg-slider${disabled ? ' is-disabled' : ''}`}>
       <div
         ref={trackRef}
         className="cfg-slider-track"
-        style={{ position: 'absolute', left: x, top: y - 7, width: w, height: 22, cursor: 'var(--cur-over, pointer)' }}
         onPointerDown={e => {
+          if (disabled) return;
           dragRef.current = true;
           setFromClient(e.clientX);
         }}
-        onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}
-      />
-      <img
-        src={knobUrl}
-        alt=""
-        draggable={false}
-        className="cfg-knob"
-        style={{
-          position: 'absolute',
-          left: x + ratio * w - knobW / 2,
-          top: y + (8 - knobH) / 2,
-          width: knobW, height: knobH,
-          pointerEvents: 'none',
-          opacity: hover ? 1 : 0.92,
-        }}
-      />
-    </>
+      >
+        <div className="cfg-slider-fill" style={{ width: `${ratio * 100}%` }} />
+        <div className="cfg-slider-knob" style={{ left: `${ratio * 100}%` }} />
+      </div>
+    </div>
   );
 };
 
-/** Radio group whose labels/pills are baked into switch%cref (227x254). */
-const SwitchGroup: React.FC<{
-  runner: any;
-  page: string;
-  groups: Array<{ sfKey?: string; a: any; b: any; action?: (side: 0 | 1) => void }>;
-}> = ({ runner, page, groups }) => {
-  const sf = runner.sf || {};
-  const set = (patch: Record<string, any>) => runner.setSf((prev: any) => ({ ...prev, ...patch }));
-  const normal = cfgUrl(page, 'switch%cref;normal');
-  const on = cfgUrl(page, 'switch%cref;on');
-  const [hoverPill, setHoverPill] = useState<number | null>(null);
-  const over = cfgUrl(page, 'switch%cref;over');
+/** Two-pill radio (engine switch%cref replacement). */
+const Segmented: React.FC<{
+  value: any; a: { value: any; label: string }; b: { value: any; label: string };
+  onChange: (v: any) => void;
+}> = ({ value, a, b, onChange }) => (
+  <div className="cfg-seg">
+    {[a, b].map((opt, i) => (
+      <button key={i}
+        className={`cfg-seg-btn${value === opt.value ? ' is-on' : ''}`}
+        onClick={e => { e.currentTarget.blur(); onChange(opt.value); }}>
+        {opt.label}
+      </button>
+    ))}
+  </div>
+);
 
-  const pills = CFG_SYSTEM.pills;
-  // selection state per pill pair (a = left pill true-ish, b = right)
-  const selected: boolean[] = pills.map((_, i) => {
-    const g = groups[Math.floor(i / 2)];
-    if (!g || !g.sfKey) return false;
-    const cur = sf[g.sfKey] ?? g.a.value;
-    const val = i % 2 === 0 ? g.a.value : g.b.value;
-    return cur === val;
-  });
+/** Checkbox + label (engine ask%cref / wide toggle replacement). */
+const Check: React.FC<{
+  checked: boolean; onChange: () => void; label: string;
+}> = ({ checked, onChange, label }) => (
+  <button className={`cfg-check${checked ? ' is-on' : ''}`}
+    onClick={e => { e.currentTarget.blur(); onChange(); }}>
+    <span className="cfg-check-box" aria-hidden="true" />
+    <span className="cfg-check-label">{label}</span>
+  </button>
+);
 
+/** JP label with the small EN sub-caption printed on the authentic sheet. */
+const Label: React.FC<{ jp: string; en: string; dim?: boolean }> = ({ jp, en, dim }) => {
+  const { lang } = useI18n();
   return (
-    <>
-      <img src={normal} alt="" draggable={false}
-        style={{ position: 'absolute', ...cfgRect(CFG_SYSTEM.switchGroup), pointerEvents: 'none' }} />
-      {selected.map((sel, i) => sel && (
-        <div key={`sel${i}`} className="cfg-pill-sel"
-          style={{
-            position: 'absolute',
-            left: CFG_SYSTEM.switchGroup.x + pills[i].x,
-            top: CFG_SYSTEM.switchGroup.y + pills[i].y,
-            width: pills[i].w, height: pills[i].h,
-            borderRadius: 4, overflow: 'hidden', pointerEvents: 'none',
-          }}>
-          <img src={on} alt="" draggable={false} style={{
-            position: 'absolute',
-            left: -pills[i].x, top: -pills[i].y,
-            width: CFG_SYSTEM.switchGroup.w, height: CFG_SYSTEM.switchGroup.h,
-          }} />
-        </div>
-      ))}
-      {hoverPill != null && (
-        <div style={{
-          position: 'absolute',
-          left: CFG_SYSTEM.switchGroup.x + pills[hoverPill].x,
-          top: CFG_SYSTEM.switchGroup.y + pills[hoverPill].y,
-          width: pills[hoverPill].w, height: pills[hoverPill].h,
-          borderRadius: 4, overflow: 'hidden', pointerEvents: 'none', opacity: 0.55,
-        }}>
-          <img src={over} alt="" draggable={false} style={{
-            position: 'absolute',
-            left: -pills[hoverPill].x, top: -pills[hoverPill].y,
-            width: CFG_SYSTEM.switchGroup.w, height: CFG_SYSTEM.switchGroup.h,
-          }} />
-        </div>
-      )}
-      {pills.map((p, i) => {
-        const g = groups[Math.floor(i / 2)];
-        const side = (i % 2) as 0 | 1;
-        return (
-          <Hit key={i}
-            x={CFG_SYSTEM.switchGroup.x + p.x} y={CFG_SYSTEM.switchGroup.y + p.y}
-            w={p.w} h={p.h + 10}
-            onClick={() => g.action
-              ? g.action(side)
-              : set({ [g.sfKey!]: side === 0 ? g.a.value : g.b.value })}
-            onHover={v => setHoverPill(v ? i : null)}
-          />
-        );
-      })}
-    </>
+    <div className={`cfg-lbl${dim ? ' is-dim' : ''}`}>
+      <span className="cfg-lbl-jp">{jp}</span>
+      {lang === 'ja' && en && <span className="cfg-lbl-en">{en}</span>}
+    </div>
   );
 };
 
-/** Checkbox glyph crop positions inside ask%cref art (226x218 local).
- *  Pixel-diff of off vs on puts the check strokes at x1..12 / x117..128. */
-const ASK_GLYPH = [
-  { x: 0, y: 0, w: 16, h: 17 },    // 確認セーブ
-  { x: 116, y: 0, w: 16, h: 17 },  // 確認ロード
-  { x: 0, y: 21, w: 16, h: 17 },   // 確認qセーブ
-  { x: 116, y: 21, w: 16, h: 17 }, // 確認qロード
-  { x: 0, y: 204, w: 16, h: 14 },  // ウィンドウスタイル (CG 表示中はシンプル)
-];
-
-const AskGroup: React.FC<{ runner: any; page: string }> = ({ runner, page }) => {
-  const sf = runner.sf || {};
-  const set = (patch: Record<string, any>) => runner.setSf((prev: any) => ({ ...prev, ...patch }));
-  const on = cfgUrl(page, 'ask%cref;on');
-  const [hover, setHover] = useState<number | null>(null);
-
+const Section: React.FC<{
+  title: string; sub: string; dark?: boolean; children: React.ReactNode;
+}> = ({ title, sub, dark, children }) => {
+  const { lang } = useI18n();
+  // The JP sheet prints literal lowercase "system"/"text" headers;
+  // capitalize them in the English UI.
+  const head = lang === 'en' ? title.charAt(0).toUpperCase() + title.slice(1) : title;
   return (
-    <>
-      <img src={cfgUrl(page, 'ask%cref;off')} alt="" draggable={false}
-        style={{ position: 'absolute', ...cfgRect(CFG_SYSTEM.askGroup), pointerEvents: 'none' }} />
-      {CFG_SYSTEM.checks.map((c, i) => {
-        const checked = sf[c.key] ?? true;
-        const g = ASK_GLYPH[i];
-        return (
-          <React.Fragment key={c.key}>
-            {checked && (
-              <div style={{
-                position: 'absolute',
-                left: CFG_SYSTEM.askGroup.x + g.x, top: CFG_SYSTEM.askGroup.y + g.y,
-                width: g.w, height: g.h, overflow: 'hidden', pointerEvents: 'none',
-              }}>
-                <div style={{
-                  position: 'absolute', left: -g.x, top: -g.y,
-                  width: CFG_SYSTEM.askGroup.w, height: CFG_SYSTEM.askGroup.h,
-                  backgroundImage: `url(${on})`, backgroundSize: 'contain',
-                }} />
-              </div>
-            )}
-            {hover === i && checked !== undefined && (
-              <div style={{
-                position: 'absolute',
-                left: c.x, top: c.y, width: c.w, height: c.h,
-                background: 'rgba(128,104,172,0.10)', borderRadius: 3, pointerEvents: 'none',
-              }} />
-            )}
-            <Hit x={c.x} y={c.y} w={c.w} h={c.h}
-              onClick={() => set({ [c.key]: !checked })}
-              onHover={v => setHover(v ? i : null)} />
-          </React.Fragment>
-        );
-      })}
-    </>
+    <section className={`cfg-sec${dark ? ' is-dark' : ''}`}>
+      <h3 className="cfg-sec-head">
+        <span>{head}</span>
+        {sub && <span className="cfg-sec-sub">{sub}</span>}
+      </h3>
+      <div className="cfg-sec-body">{children}</div>
+    </section>
   );
 };
 
-/** Wide sound-page toggle with complete baked off/on art. */
-const WideToggle: React.FC<{
-  runner: any; page: string; spec: typeof CFG_SOUND.wideToggles[number];
-}> = ({ runner, page, spec }) => {
-  const sf = runner.sf || {};
-  const [hover, setHover] = useState(false);
-  const on = sf[spec.key] ?? true;
-  const tail = hover ? `${spec.asset}%toggle;over;${on ? 'on' : 'off'}`
-                     : `${spec.asset}%toggle;${on ? 'on' : 'off'}`;
-  return (
-    <>
-      <img src={cfgUrl(page, tail)} alt="" draggable={false} style={{
-        position: 'absolute',
-        left: spec.x + spec.img.ox, top: spec.y + spec.img.oy,
-        width: spec.img.w, height: spec.img.h, pointerEvents: 'none',
-      }} />
-      <Hit x={spec.x} y={spec.y} w={spec.w} h={spec.h}
-        onClick={() => runner.setSf((prev: any) => ({ ...prev, [spec.key]: !on }))}
-        onHover={setHover} />
-    </>
-  );
-};
+const Row: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="cfg-row">{children}</div>
+);
 
-function cfgRect(r: { x: number; y: number; w: number; h: number }) {
-  return { left: r.x, top: r.y, width: r.w, height: r.h };
-}
-
+// ---------------------------------------------------------------------------
+// Pages
 // ---------------------------------------------------------------------------
 
 const SystemPage: React.FC<{ runner: any; onToggleFs: () => void }> = ({ runner, onToggleFs }) => {
-  const page = CFG_PAGES[0];
+  const { t } = useI18n();
   const sf = runner.sf || {};
   const set = (patch: Record<string, any>) => runner.setSf((prev: any) => ({ ...prev, ...patch }));
-
-  const knob = cfgUrl(page, 'nsld%slider;normal');
+  // Engine parity: the five ask%cref rows read as checked when unset.
+  const ask = (k: string) => sf[k] ?? true;
 
   return (
     <>
-      <SwitchGroup runner={runner} page={page} groups={[
-        { sfKey: 'screenMode', a: { value: 'window' }, b: { value: 'full' },
-          action: () => onToggleFs() },
-        { sfKey: 'designCursor', a: { value: true }, b: { value: false } },
-        { sfKey: 'showBGMTitle', a: { value: true }, b: { value: false } },
-        { sfKey: 'skipMode', a: { value: 'READ_ONLY' }, b: { value: 'ALL' } },
-      ]} />
-      <AskGroup runner={runner} page={page} />
-      {CFG_SYSTEM.sliders.map(s => (
-        <SkinSlider key={s.key}
-          x={s.x} y={s.y} w={s.w} knobUrl={knob}
-          knobW={CFG_SYSTEM.knobs.w} knobH={CFG_SYSTEM.knobs.h}
-          value={sf[s.key] ?? s.def}
-          onChange={v => set({ [s.key]: v })} />
-      ))}
+      <Section title={t('cfg.sec.system')} sub="">
+        <Row>
+          <Label jp={t('cfg.screenMode')} en={t('cfg.screenModeSub')} />
+          <Segmented
+            value={sf.screenMode ?? 'window'}
+            a={{ value: 'window', label: t('cfg.window') }}
+            b={{ value: 'full', label: t('cfg.fullscreen') }}
+            onChange={onToggleFs}
+          />
+        </Row>
+        <Row>
+          <Label jp={t('cfg.cursor')} en={t('cfg.cursorSub')} />
+          <Segmented
+            value={sf.designCursor ?? true}
+            a={{ value: true, label: t('cfg.design') }}
+            b={{ value: false, label: t('cfg.systemCursor') }}
+            onChange={v => set({ designCursor: v })}
+          />
+        </Row>
+        <Row>
+          <Label jp={t('cfg.effectSpeed')} en={t('cfg.effectSpeedSub')} />
+          <span className="cfg-ctl">
+            <span className="cfg-slider-col">
+              <Slider value={sf.drawPos ?? 120} onChange={v => set({ drawPos: v })} />
+              <span className="cfg-ends"><span>{t('cfg.slow')}</span><span>{t('cfg.fast')}</span></span>
+            </span>
+          </span>
+        </Row>
+        <Row>
+          <Label jp={t('cfg.bgmTitle')} en={t('cfg.bgmTitleSub')} />
+          <Segmented
+            value={sf.showBGMTitle ?? true}
+            a={{ value: true, label: t('cfg.on') }}
+            b={{ value: false, label: t('cfg.off') }}
+            onChange={v => set({ showBGMTitle: v })}
+          />
+        </Row>
+        <Row>
+          <Label jp={t('cfg.confirmDialogs')} en={t('cfg.confirmDialogsSub')} />
+          <div className="cfg-check-grid">
+            {(['confirmSave', 'confirmLoad', 'confirmQSave', 'confirmQLoad'] as const).map(k => (
+              <Check key={k} checked={ask(k)} label={t(`cfg.${k}` as TKey)}
+                onChange={() => set({ [k]: !ask(k) })} />
+            ))}
+          </div>
+        </Row>
+      </Section>
+
+      <Section title={t('cfg.sec.text')} sub="">
+        <Row>
+          <Label jp={t('cfg.messageSpeed')} en={t('cfg.messageSpeedSub')} />
+          <span className="cfg-ctl">
+            <span className="cfg-slider-col">
+              <Slider value={sf.textPos ?? 32} onChange={v => set({ textPos: v })} />
+              <span className="cfg-ends"><span>{t('cfg.slow')}</span><span>{t('cfg.fast')}</span></span>
+            </span>
+          </span>
+        </Row>
+        <Row>
+          <Label jp={t('cfg.skipMode')} en={t('cfg.skipModeSub')} />
+          <Segmented
+            value={sf.skipMode ?? 'ALL'}
+            a={{ value: 'READ_ONLY', label: t('cfg.skipRead') }}
+            b={{ value: 'ALL', label: t('cfg.skipAll') }}
+            onChange={v => set({ skipMode: v })}
+          />
+        </Row>
+        <Row>
+          <Label jp={t('cfg.autoSpeed')} en={t('cfg.autoSpeedSub')} />
+          <span className="cfg-ctl">
+            <span className="cfg-slider-col">
+              <Slider value={sf.autoPos ?? 110} onChange={v => set({ autoPos: v })} />
+              <span className="cfg-ends"><span>{t('cfg.slow')}</span><span>{t('cfg.fast')}</span></span>
+            </span>
+          </span>
+        </Row>
+        <Row>
+          <Label jp={t('cfg.windowOpacity')} en={t('cfg.windowOpacitySub')} />
+          <span className="cfg-ctl">
+            <Slider value={sf.windowOpac ?? 255}
+              onChange={v => set({ windowOpac: v })} />
+            <span className="cfg-pct">{Math.round((sf.windowOpac ?? 255) / 255 * 100)}%</span>
+          </span>
+        </Row>
+        <Row>
+          <Label jp={t('cfg.windowStyle')} en={t('cfg.windowStyleSub')} />
+          <Check checked={ask('simpleEventWindow')} label={t('cfg.simpleWindow')}
+            onChange={() => set({ simpleEventWindow: !ask('simpleEventWindow') })} />
+        </Row>
+      </Section>
     </>
   );
 };
 
 const SoundPage: React.FC<{ runner: any }> = ({ runner }) => {
-  const page = CFG_PAGES[1];
+  const { t, lang } = useI18n();
   const sf = runner.sf || {};
   const set = (patch: Record<string, any>) => runner.setSf((prev: any) => ({ ...prev, ...patch }));
-  const knob = cfgUrl(page, 'nsld%slider;normal');
-  const smallKnob = cfgUrl(page, 'vsld%slider;normal');
+  // Engine parity: the two wide toggles read as on when unset.
+  const voiceCut = sf.voiceCut ?? true;
+  const bgmDown = sf.bgmDown ?? true;
+
+  const volRows: Array<{ key: string; label: TKey; def: number }> = [
+    { key: 'masterVol', label: 'cfg.master', def: 80 },
+    { key: 'bgmVol', label: 'cfg.bgm', def: 80 },
+    { key: 'seVol', label: 'cfg.se', def: 80 },
+    { key: 'voiceVol', label: 'cfg.voice', def: 80 },
+  ];
 
   return (
     <>
-      {CFG_SOUND.sliders.map(s => (
-        <SkinSlider key={s.key}
-          x={s.x} y={s.y} w={s.w} knobUrl={knob}
-          knobW={CFG_SOUND.knobs.w} knobH={CFG_SOUND.knobs.h}
-          value={sf[s.key] ?? s.def} max={s.max}
-          onChange={v => set({ [s.key]: v })} />
-      ))}
-      {CFG_SOUND.wideToggles.map(spec => (
-        <WideToggle key={spec.key} runner={runner} page={page} spec={spec} />
-      ))}
-      {CFG_SOUND.chars.map((ch, i) => {
-        const [fx, fy] = CFG_SOUND.cellOrigins[i];
-        const muted = !!sf.voiceMute?.[ch];
-        const gain = sf.voiceGain?.[ch] ?? 100;
-        return (
-          <React.Fragment key={ch}>
-            <img src={cfgUrl(page, `人物像%layer;${i + 1}`)} alt="" draggable={false} style={{
-              position: 'absolute', left: fx, top: fy,
-              width: CFG_SOUND.faceW, height: CFG_SOUND.faceH, pointerEvents: 'none',
-            }} />
-            <Hit x={fx + 1} y={fy + 1} w={CFG_SOUND.toggleSize} h={CFG_SOUND.toggleSize}
-              onClick={() => set({ voiceMute: { ...(sf.voiceMute || {}), [ch]: !muted } })} />
-            {muted && (
-              <img src={cfgUrl(page, 'voice%toggle;off')} alt="" draggable={false} style={{
-                position: 'absolute', left: fx + 1, top: fy + 1,
-                width: CFG_SOUND.toggleSize, height: CFG_SOUND.toggleSize, pointerEvents: 'none',
-              }} />
-            )}
-            <div style={{
-              position: 'absolute',
-              left: fx + CFG_SOUND.smallKnob.dx,
-              top: fy + CFG_SOUND.smallKnob.dy - 8,
-              width: CFG_SOUND.smallKnob.trackW, height: 22,
-              opacity: muted ? 0.4 : 1, pointerEvents: muted ? 'none' : 'auto',
-              cursor: 'var(--cur-over, pointer)',
-            }}
-              onPointerDown={e => {
-                const el = e.currentTarget;
-                const move = (ev: PointerEvent) => {
-                  const r = el.getBoundingClientRect();
-                  const p = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
-                  set({ voiceGain: { ...(runner.sf.voiceGain || {}), [ch]: Math.round(p * 100) } });
-                };
-                const up = () => {
-                  window.removeEventListener('pointermove', move);
-                  window.removeEventListener('pointerup', up);
-                };
-                window.addEventListener('pointermove', move);
-                window.addEventListener('pointerup', up);
-                const r = el.getBoundingClientRect();
-                const p = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
-                set({ voiceGain: { ...(sf.voiceGain || {}), [ch]: Math.round(p * 100) } });
-              }}
-            />
-            {!muted && (
-              <img src={smallKnob} alt="" draggable={false} style={{
-                position: 'absolute',
-                left: fx + CFG_SOUND.smallKnob.dx
-                  + (gain / 100) * CFG_SOUND.smallKnob.trackW - CFG_SOUND.smallKnob.w / 2,
-                top: fy + CFG_SOUND.smallKnob.dy,
-                width: CFG_SOUND.smallKnob.w, height: CFG_SOUND.smallKnob.h,
-                pointerEvents: 'none',
-              }} />
-            )}
-          </React.Fragment>
-        );
-      })}
+      <Section title={t('cfg.sec.volume')} sub={lang === 'ja' ? t('cfg.sec.volumeSub') : ''}>
+        {volRows.map(r => (
+          <Row key={r.key}>
+            <Label jp={t(r.label)} en="" />
+            <span className="cfg-ctl">
+              <Slider value={sf[r.key] ?? r.def} max={100}
+                onChange={v => set({ [r.key]: v })} />
+              <span className="cfg-pct">{sf[r.key] ?? r.def}</span>
+            </span>
+          </Row>
+        ))}
+      </Section>
+
+      <Section title={t('cfg.sec.voiceOption')} sub={lang === 'ja' ? t('cfg.sec.voiceOptionSub') : ''}>
+        <div className="cfg-wide-checks">
+          <Check checked={voiceCut} label={t('cfg.voiceKeep')}
+            onChange={() => set({ voiceCut: !voiceCut })} />
+          <Check checked={bgmDown} label={t('cfg.bgmDuck')}
+            onChange={() => set({ bgmDown: !bgmDown })} />
+        </div>
+      </Section>
+
+      <Section title={t('cfg.perVoice')} sub="">
+        <div className="cfg-voice-grid">
+          {CFG_VOICE_CHARS.map((ch, i) => {
+            const nameKey =
+              ch === 'wom' ? 'cfg.otherFemale' :
+              ch === 'man' ? 'cfg.otherMale' :
+              `cfg.ch.${ch}` as TKey;
+            const muted = !!sf.voiceMute?.[ch];
+            const gain = sf.voiceGain?.[ch] ?? 100;
+            return (
+              <div key={ch} className={`cfg-voice${muted ? ' is-muted' : ''}`}>
+                <button className="cfg-voice-face" title={t('cfg.mute')}
+                  onClick={e => {
+                    e.currentTarget.blur();
+                    set({ voiceMute: { ...(sf.voiceMute || {}), [ch]: !muted } });
+                  }}>
+                  <img src={cfgSoundUrl(`人物像%layer;${i + 1}`)} alt="" draggable={false} />
+                  {muted && (
+                    <img className="cfg-voice-mute" src={cfgSoundUrl('voice%toggle;off')}
+                      alt="" draggable={false} />
+                  )}
+                </button>
+                <div className="cfg-voice-body">
+                  <span className="cfg-voice-name">{t(nameKey)}</span>
+                  <Slider value={gain} max={100} disabled={muted}
+                    onChange={v => set({
+                      voiceGain: { ...(runner.sf.voiceGain || {}), [ch]: v },
+                    })} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Section>
     </>
+  );
+};
+
+const SHORTCUTS: Array<{ key: string; label: TKey }> = [
+  { key: 'F1', label: 'cfg.sc.f1' },
+  { key: 'F2', label: 'cfg.sc.f2' },
+  { key: 'F3', label: 'cfg.sc.f3' },
+  { key: 'F4', label: 'cfg.sc.f4' },
+  { key: 'F5', label: 'cfg.sc.f5' },
+  { key: 'F6', label: 'cfg.sc.f6' },
+  { key: 'F7', label: 'cfg.sc.f7' },
+  { key: 'F8', label: 'cfg.sc.f8' },
+  { key: 'F9', label: 'cfg.sc.f9' },
+  { key: 'F11', label: 'cfg.sc.f11' },
+  { key: 'F12', label: 'cfg.sc.f12' },
+  { key: 'Ctrl', label: 'cfg.sc.ctrl' },
+  { key: 'Space', label: 'cfg.sc.space' },
+  { key: 'Shift+S', label: 'cfg.sc.ss' },
+  { key: 'Shift+L', label: 'cfg.sc.sl' },
+];
+
+const ShortcutPage: React.FC = () => {
+  const { t } = useI18n();
+  return (
+    <Section dark title={t('cfg.sec.shortcuts')} sub="">
+      <div className="cfg-keys">
+        {SHORTCUTS.map(s => (
+          <div key={s.key} className="cfg-keyrow">
+            <span className="cfg-keybadge">{s.key}</span>
+            <span className="cfg-keylabel">{t(s.label)}</span>
+          </div>
+        ))}
+      </div>
+    </Section>
   );
 };
 
 // ---------------------------------------------------------------------------
 
 const ConfigOverlay: React.FC<Props> = ({ runner }) => {
+  const { t } = useI18n();
   const sf = runner.sf || {};
-  const page = (((sf.systemPage ?? 0) | 0) as CfgPage);
+  const page = Math.max(0, Math.min(2, (sf.systemPage ?? 0) | 0));
   const set = (patch: Record<string, any>) => runner.setSf((prev: any) => ({ ...prev, ...patch }));
-  const [hoverTab, setHoverTab] = useState<number | null>(null);
-  const [hoverReset, setHoverReset] = useState(false);
-  const [hoverBack, setHoverBack] = useState(false);
   const [isFs, setIsFs] = useState(false);
 
   useEffect(() => {
@@ -418,53 +393,48 @@ const ConfigOverlay: React.FC<Props> = ({ runner }) => {
     });
   };
 
-  const storage = CFG_PAGES[page];
-  const tabState = (i: number) =>
-    i === page ? 'on' : hoverTab === i ? 'over' : 'normal';
-  const TAB_OFFSET: Record<string, { x: number; y: number }> = {
-    normal: { x: 17, y: 1 }, over: { x: 16, y: 0 }, on: { x: 0, y: 1 },
-  };
+  const tabs: Array<{ i: number; label: string }> = [
+    { i: 0, label: t('cfg.tab.system') },
+    { i: 1, label: t('cfg.tab.sound') },
+    { i: 2, label: t('cfg.tab.shortcut') },
+  ];
 
   return (
     <div className="cfg-overlay" onClick={e => e.stopPropagation()}
       onMouseDown={e => e.stopPropagation()}>
-      <img className="cfg-base" src={cfgUrl(storage, '背景%base')} alt="" draggable={false} />
+      <aside className="cfg-side">
+        <div className="cfg-brand">
+          <span className="cfg-brand-jp">{t('cfg.title')}</span>
+          <span className="cfg-brand-en">Config</span>
+        </div>
+        <nav className="cfg-tabs">
+          {tabs.map(tab => (
+            <button key={tab.i}
+              className={`cfg-tab${page === tab.i ? ' is-on' : ''}`}
+              onClick={e => { e.currentTarget.blur(); set({ systemPage: tab.i }); }}>
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+        <div className="cfg-side-bottom">
+          <button className="cfg-side-btn"
+            onClick={e => { e.currentTarget.blur(); doReset(); }}>
+            {t('cfg.reset')}
+          </button>
+          <button className="cfg-side-btn is-back"
+            onClick={e => { e.currentTarget.blur(); close(); }}>
+            {t('cfg.back')}
+          </button>
+        </div>
+      </aside>
 
-      {/* page sheet */}
-      <img src={cfgUrl(storage, 'タブシート%layer')} alt="" draggable={false} style={{
-        position: 'absolute', ...cfgRect(CFG_CHROME.sheet[page]), pointerEvents: 'none',
-      }} />
-
-      {/* page widgets */}
-      {page === 0 && <SystemPage runner={runner} onToggleFs={toggleFullscreen} />}
-      {page === 1 && <SoundPage runner={runner} />}
-      {/* page 2: shortcut list is fully baked into the sheet art */}
-
-      {/* tab cref (labels baked; on/over/normal differ in size) */}
-      {CFG_CHROME.tabHits.map((h, i) => {
-        const state = tabState(i);
-        const off = TAB_OFFSET[state];
-        return (
-          <React.Fragment key={i}>
-            <img src={cfgUrl(storage, `alltabs%cref;${state}`)} alt="" draggable={false} style={{
-              position: 'absolute',
-              left: CFG_CHROME.tabs.x + off.x, top: CFG_CHROME.tabs.y + off.y,
-              pointerEvents: 'none',
-            }} />
-            <Hit x={h.x} y={h.y} w={h.w} h={h.h}
-              onClick={() => set({ systemPage: i })}
-              onHover={v => setHoverTab(v ? i : null)} />
-          </React.Fragment>
-        );
-      })}
-
-      {/* reset / back */}
-      <img src={cfgUrl(storage, `初期化%button;${hoverReset ? 'over' : 'off'}`)} alt=""
-        draggable={false} style={{ position: 'absolute', ...cfgRect(CFG_CHROME.reset), pointerEvents: 'none' }} />
-      <Hit {...CFG_CHROME.reset} onClick={doReset} onHover={setHoverReset} />
-      <img src={cfgUrl(storage, `戻る%button;${hoverBack ? 'over' : 'off'}`)} alt=""
-        draggable={false} style={{ position: 'absolute', ...cfgRect(CFG_CHROME.back), pointerEvents: 'none' }} />
-      <Hit {...CFG_CHROME.back} onClick={close} onHover={setHoverBack} />
+      <main className={`cfg-main${page === 2 ? ' is-dark' : ''}`}>
+        <div className="cfg-scroll">
+          {page === 0 && <SystemPage runner={runner} onToggleFs={toggleFullscreen} />}
+          {page === 1 && <SoundPage runner={runner} />}
+          {page === 2 && <ShortcutPage />}
+        </div>
+      </main>
     </div>
   );
 };

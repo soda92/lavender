@@ -1281,20 +1281,18 @@ button.danger { border-color: #b4555f; background: #4d2830; }
 }
 
 /* ------------------------------------------------------------------ */
-/* Authentic config overlay (config_system/sound/shortcut skins)      */
+/* Config overlay — pure HTML/CSS (authentic config_* art replaced;   */
+/* only the per-character portraits + mute glyph survive).            */
 /* ------------------------------------------------------------------ */
 .cfg-overlay {
   position: absolute;
   inset: 0;
   z-index: 120;
   user-select: none;
-}
-.cfg-overlay .cfg-base {
-  position: absolute;
-  inset: 0;
-  width: 800px;
-  height: 600px;
-  pointer-events: none;
+  display: flex;
+  font-size: 12px;
+  color: #3a3550;
+  background: linear-gradient(120deg, #b6a7d8 0%, #cfc4e6 21%, #ece8f5 22%, #f7f6fb 100%);
 }
 .cfg-hit {
   background: none;
@@ -1306,7 +1304,275 @@ button.danger { border-color: #b4555f; background: #4d2830; }
   display: block;
 }
 .cfg-hit:focus { outline: none; }
-.cfg-slider-track { touch-action: none; }
+
+/* left sidebar */
+.cfg-side {
+  width: 152px;
+  flex: none;
+  height: 100%;
+  padding: 16px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cfg-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 6px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.55);
+}
+.cfg-brand-jp { font-size: 15px; font-weight: 700; color: #40335f; letter-spacing: 2px; }
+.cfg-brand-en { font-size: 9px; color: #7d6fa3; letter-spacing: 3px; }
+.cfg-tabs { display: flex; flex-direction: column; gap: 6px; }
+.cfg-tab {
+  text-align: left;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  color: #4f4470;
+  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 5px;
+  cursor: var(--cur-over, pointer);
+  transition: background 0.12s ease;
+}
+.cfg-tab:hover { background: rgba(255, 255, 255, 0.6); }
+.cfg-tab.is-on {
+  background: #fdfcff;
+  border-color: #fdfcff;
+  color: #6c4fb0;
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(90, 70, 140, 0.25);
+}
+.cfg-side-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
+.cfg-side-btn {
+  padding: 7px 0;
+  font-size: 12.5px;
+  color: #4f4470;
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 5px;
+  cursor: var(--cur-over, pointer);
+}
+.cfg-side-btn:hover { background: rgba(255, 255, 255, 0.75); }
+.cfg-side-btn.is-back { font-weight: 700; }
+
+/* right content */
+.cfg-main {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 14px 20px 12px 10px;
+}
+.cfg-scroll {
+  height: 100%;
+  overflow-y: auto;
+  padding: 4px 14px 10px 18px;
+  scrollbar-width: thin;
+  scrollbar-color: #b3a6d4 transparent;
+}
+.cfg-scroll::-webkit-scrollbar { width: 8px; }
+.cfg-scroll::-webkit-scrollbar-thumb { background: #b3a6d4; border-radius: 4px; }
+.cfg-main.is-dark .cfg-scroll { scrollbar-color: #6d6585 transparent; }
+.cfg-main.is-dark .cfg-scroll::-webkit-scrollbar-thumb { background: #6d6585; }
+
+.cfg-sec + .cfg-sec { margin-top: 12px; }
+.cfg-sec-head {
+  margin: 0 0 3px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #5f528a;
+}
+.cfg-sec-sub { font-size: 8.5px; font-weight: 400; color: #a299bd; letter-spacing: 1px; text-transform: lowercase; }
+.cfg-sec-body > .cfg-row + .cfg-row { border-top: 1px dotted #d9d2ea; }
+.cfg-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 27px;
+  padding: 3px 2px;
+}
+
+/* label with JP + small EN sub */
+.cfg-lbl { display: flex; flex-direction: column; line-height: 1.25; }
+.cfg-lbl-jp { font-size: 11.5px; color: #3d3757; }
+.cfg-lbl-en { font-size: 8px; color: #a098bb; letter-spacing: 0.5px; }
+.cfg-lbl.is-dim { opacity: 0.55; }
+
+/* segmented pill radio */
+.cfg-seg {
+  display: inline-flex;
+  border: 1px solid #b3a6d4;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #fff;
+  flex: none;
+}
+.cfg-seg-btn {
+  border: 0;
+  background: transparent;
+  padding: 2.5px 12px;
+  font-size: 10.5px;
+  color: #6c6388;
+  cursor: var(--cur-over, pointer);
+}
+.cfg-seg-btn + .cfg-seg-btn { border-left: 1px solid #ddd5ee; }
+.cfg-seg-btn:hover { background: #f1edfa; }
+.cfg-seg-btn.is-on { background: #8a71c4; color: #fff; font-weight: 700; }
+.cfg-seg-btn.is-on + .cfg-seg-btn,
+.cfg-seg-btn:has(+ .cfg-seg-btn.is-on) { border-left-color: transparent; }
+
+/* checkbox */
+.cfg-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: 0;
+  padding: 1px 0;
+  font-size: 10.5px;
+  color: #4a4366;
+  cursor: var(--cur-over, pointer);
+  text-align: left;
+}
+.cfg-check-box {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border: 1.5px solid #8e82b4;
+  border-radius: 2px;
+  background: #fff;
+  position: relative;
+}
+.cfg-check.is-on .cfg-check-box { background: #8a71c4; border-color: #8a71c4; }
+.cfg-check.is-on .cfg-check-box::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0.5px;
+  width: 4px;
+  height: 7.5px;
+  border: solid #fff;
+  border-width: 0 1.6px 1.6px 0;
+  transform: rotate(42deg);
+}
+.cfg-check-grid { display: grid; grid-template-columns: repeat(2, max-content); gap: 3px 18px; }
+.cfg-wide-checks { display: flex; flex-direction: column; gap: 3px; padding: 2px 0; }
+
+/* sliders */
+.cfg-ctl { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+.cfg-slider-col { display: flex; flex-direction: column; gap: 1px; }
+.cfg-slider { width: 138px; padding: 4px 2px; touch-action: none; }
+.cfg-slider-track {
+  position: relative;
+  height: 5px;
+  border-radius: 3px;
+  background: #d9d2e8;
+  cursor: var(--cur-over, pointer);
+}
+.cfg-slider-fill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  border-radius: 3px;
+  background: #9d86c9;
+  pointer-events: none;
+}
+.cfg-slider-knob {
+  position: absolute;
+  top: 50%;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #8a71c4;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 1px 2px rgba(80, 60, 120, 0.35);
+  pointer-events: none;
+}
+.cfg-slider.is-disabled { opacity: 0.4; }
+.cfg-slider.is-disabled .cfg-slider-track { cursor: default; }
+.cfg-ends {
+  width: 138px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 8px;
+  color: #a098bb;
+  letter-spacing: 0.5px;
+}
+.cfg-pct {
+  font-size: 10px;
+  color: #7a7099;
+  min-width: 32px;
+  text-align: right;
+}
+
+/* per-character voice cells */
+.cfg-voice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px 12px;
+  padding: 3px 0;
+}
+.cfg-voice { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.cfg-voice-face {
+  position: relative;
+  width: 41px;
+  height: 41px;
+  flex: none;
+  overflow: hidden;
+  border: 0;
+  padding: 0;
+  border-radius: 3px;
+  background: #e7e2f2;
+  cursor: var(--cur-over, pointer);
+}
+.cfg-voice-face img { position: absolute; left: 0; top: 0; width: 137px; height: 41px; pointer-events: none; }
+.cfg-voice-face .cfg-voice-mute { width: 41px; height: 41px; }
+.cfg-voice-body { display: flex; flex-direction: column; gap: 0; min-width: 0; }
+.cfg-voice-name {
+  font-size: 9.5px;
+  color: #4a4366;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cfg-voice-body .cfg-slider { width: 92px; padding: 2px; }
+.cfg-voice.is-muted .cfg-voice-body { opacity: 0.45; }
+
+/* dark shortcut page */
+.cfg-main.is-dark .cfg-scroll {
+  background: #34303f;
+  border-radius: 8px;
+  color: #d9d4e8;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.cfg-main.is-dark { color: #d9d4e8; }
+.cfg-main.is-dark .cfg-sec-head { color: #b3a8d6; }
+.cfg-keys {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 22px;
+  padding: 4px 6px 0;
+}
+.cfg-keyrow { display: flex; align-items: center; gap: 9px; }
+.cfg-keybadge {
+  flex: none;
+  min-width: 46px;
+  text-align: center;
+  font-size: 9px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  color: #e6e1f2;
+  border: 1px solid #8b83a3;
+  border-radius: 3px;
+  padding: 2px 5px;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.05);
+}
+.cfg-keylabel { font-size: 11px; color: #d9d4e8; }
 
 /* dialog.csv Yes/No popup */
 .skin-dialog {

@@ -10,14 +10,30 @@ Quick save/load, slot delete, and a single-session heartbeat lock exist.
 
 ## Config / Backlog overlays
 
-Both are **full-stage 800×600 modal overlays inside `.stage-frame`**,
-pixel-faithful to the authentic skins (`ConfigOverlay`, `HistoryModal`):
+Both are **full-stage 800×600 modal overlays inside `.stage-frame`**
+(`ConfigOverlay`, `HistoryModal`):
 
 - game stays blocked while open;
-- right-click / Esc = 戻る;
+- right-click / Esc = 戻る (a nested Yes/No ask owns them until answered);
 - BGM continues;
 - backlog text region (123,54,608×499) per `backlog.csv`, with per-line
   voice replay and the skin scrollbar.
+
+### Config overlay: HTML reimplementation
+
+The three config pages (`config_system` / `config_sound` /
+`config_shortcut`) are pure HTML/CSS — lavender sidebar tabs, white sheet
+and a dark shortcut card — not bit-aligned page art. Only two kinds of
+authentic bitmap survive (`skin.cfgSoundUrl`):
+
+- the 16 per-character portraits (`人物像%layer;1..16`, CSS-cropped to the
+  41×41 face well; the baked name/track strip is hidden);
+- the 41×41 red mute glyph (`voice%toggle;off`).
+
+The nested 初期化 Yes/No ask still uses the authentic `dialog` skin.
+Every label is i18n'd (`cfg.*` keys); in JP mode rows show the authentic
+JP label plus the sheet's small English sub-caption. All `sf` keys and
+defaults (`CFG_DEFAULTS`, incl. the unset-state quirks) are unchanged.
 
 ## i18n
 
