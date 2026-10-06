@@ -604,7 +604,7 @@ button.danger { border-color: #b4555f; background: #4d2830; }
   position: absolute; inset: 0;
   width: 100%; height: 100%;
   object-fit: contain;
-  cursor: default;
+  cursor: pointer;
 }
 .cg-viewer .cg-zoom-overlay {
   position: absolute; left: 50%; bottom: 0;

@@ -376,7 +376,7 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack, audio, initialViewMode = '
           {viewer.idx < viewer.variants.length - 1 && (
             <button className="cg-viewer-nav next" onClick={e => { e.stopPropagation(); stepViewer(1); }}>›</button>
           )}
-          <div className="cg-viewer-stage" onClick={e => e.stopPropagation()}>
+          <div className="cg-viewer-stage">
             <img className="cg-zoom" src={cur.url} alt={cur.stem} draggable={false} />
             {cur.overlay && (
               <img className="cg-zoom-overlay" src={overlayUrl(cur.overlay)} alt="" draggable={false} />
