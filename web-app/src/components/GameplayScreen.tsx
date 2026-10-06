@@ -110,7 +110,7 @@ const CharacterView: React.FC<{ ch: CharState; instant?: boolean }> = ({ ch, ins
       firstPaintRef.current = false;
       setGhost(null);
       setCurOpacity(1);
-      void paintSpriteComposite(rendered, canvas, () => cancelled);
+      void paintSpriteComposite(rendered, canvas, () => !cancelled);
       return () => { cancelled = true; };
     }
 
@@ -120,8 +120,8 @@ const CharacterView: React.FC<{ ch: CharState; instant?: boolean }> = ({ ch, ins
     try { snapshot = canvas.toDataURL(); } catch { /* same-origin only */ }
     setGhost(snapshot);
     setCurOpacity(0);
-    void paintSpriteComposite(rendered, canvas, () => cancelled).then(() => {
-      if (cancelled) return;
+    void paintSpriteComposite(rendered, canvas, () => !cancelled).then(ok => {
+      if (!ok || cancelled) return;
       requestAnimationFrame(() => requestAnimationFrame(() => setCurOpacity(1)));
       setTimeout(() => { if (!cancelled) setGhost(null); }, CHAR_FADE_MS + 60);
     });
