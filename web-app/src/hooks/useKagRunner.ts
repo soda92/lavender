@@ -1222,8 +1222,17 @@ export function useKagRunner(audio: {
         return 'continue';
       }
       if (args.storage) {
-        // Skipping through: do not play the movie.
-        if (fastRef.current || rangeSkipRef.current || seekRef.current != null) return 'continue';
+        // Debug seek is a silent replay: never play the movie.
+        if (seekRef.current != null) return 'continue';
+        // Engine semantics: the movie macro issues [cancelskip] first, so
+        // fast-forward / range-skip reaching the OP is released and the
+        // movie plays. A direct click on the movie itself still skips it
+        // (advance -> endVideo).
+        if (fastRef.current || rangeSkipRef.current) {
+          fastRef.current = false;
+          rangeSkipRef.current = false;
+          setIsFastForward(false);
+        }
         setIsAutoMode(false); autoRef.current = false;
         playBgmTrack(null); // the movie carries its own audio
         const v = { stem: String(args.storage) };
