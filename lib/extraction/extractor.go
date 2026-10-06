@@ -57,6 +57,15 @@ func RunExtraction(startDir string) {
 		}
 	}
 
+	// Move the design cursors' embedded hotspot to the sprig's stem tip.
+	fmt.Println("\nPatching design-cursor hotspots...")
+	nCur, err := patchCursorHotspots(outputDir)
+	if err != nil {
+		log.Printf("cursor hotspot patch error: %v", err)
+	} else if nCur > 0 {
+		fmt.Printf("  patched %d cursor file(s)\n", nCur)
+	}
+
 	// Convert all TLG5 sprites/CGs to PNG (web-native; the scenarios reference
 	// assets by bare name, so the resolver maps to .png).
 	fmt.Println("\nConverting TLG5 images to PNG...")

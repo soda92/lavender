@@ -7,8 +7,7 @@ import TitleScreen from './components/TitleScreen';
 import SidePanel, { type SideTab } from './components/SidePanel';
 import ConfigOverlay from './components/ConfigOverlay';
 import SkinDialog from './components/SkinDialog';
-import SimCursor from './components/SimCursor';
-import { simCursorMoveTo, simCursorFollow, getSimCursor } from './game/simCursor';
+import { CURSOR_DESIGN, CURSOR_OVER } from './game/skin';
 import { setDebugTimeScale, getDebugTimeScale } from './game/debugTiming';
 import { captureTransition, downloadLastCapture, type CaptureOptions } from './game/transitionCapture';
 import GalleryScreen from './components/GalleryScreen';
@@ -41,12 +40,6 @@ export default function App() {
       getDebugTimeScale,
       captureTransition: (opts?: CaptureOptions) => captureTransition(runner, opts),
       downloadLastCapture,
-      simCursor: {
-        /** Show the cursor at stage coords (800x600); next real mousemove releases it. */
-        moveTo: (x: number, y: number, shape?: 'normal' | 'over') => simCursorMoveTo(x, y, shape),
-        follow: simCursorFollow,
-        state: getSimCursor,
-      },
     };
   }, [runner]);
 
@@ -182,12 +175,15 @@ export default function App() {
         style={{
           width: 800, height: 600,
           transform: `scale(${scale})`, marginRight: stageShift,
-          // SimCursor draws the engine art; the native cursor is hidden
-          // everywhere inside the frame except the sys bar (literal
-          // cursor:pointer on .sys-btn). With design cursor off, fall
-          // back to plain OS default/hand and don't mount the sim.
-          '--cur-normal': sf.designCursor === false ? 'default' : 'none',
-          '--cur-over': sf.designCursor === false ? 'pointer' : 'none',
+          // No explicit CSS hotspot: for .cur files browsers use the
+          // embedded hotspot, which the extractor patches to the sprig's
+          // stem tip (30,30).
+          '--cur-normal': sf.designCursor === false
+            ? 'default'
+            : `url(${CURSOR_DESIGN}), default`,
+          '--cur-over': sf.designCursor === false
+            ? 'pointer'
+            : `url(${CURSOR_OVER}), pointer`,
           cursor: 'var(--cur-normal)',
         } as CSSProperties}
       >
@@ -226,9 +222,6 @@ export default function App() {
         {runner.askDialog && (
           <SkinDialog kind={runner.askDialog} onAnswer={runner.answerConfirm} />
         )}
-
-        {/* software-rendered engine cursor (native hidden over the stage) */}
-        <SimCursor enabled={sf.designCursor !== false} />
 
       </div>
 

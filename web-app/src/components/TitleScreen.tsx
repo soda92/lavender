@@ -1,4 +1,4 @@
-import React, { useEffect, useState, type CSSProperties } from 'react';
+import React, { useEffect, useState } from 'react';
 import { SKIN } from '../game/skin';
 
 interface Props {
@@ -58,11 +58,7 @@ const TitleScreen: React.FC<Props> = ({
         <button
           key={m.id}
           className="title-menu-btn"
-          style={{
-            top: ROW_TOPS[i],
-            cursor: m.id === 'load' && !hasAutosave ? 'var(--cur-normal, default)' : 'var(--cur-over, pointer)',
-            '--cur-hover': m.id === 'load' && !hasAutosave ? 'normal' : 'over',
-          } as CSSProperties}
+          style={{ top: ROW_TOPS[i], cursor: m.id === 'load' && !hasAutosave ? 'var(--cur-normal, default)' : 'var(--cur-over, pointer)' }}
           onMouseEnter={() => setHover(i)}
           onMouseLeave={() => setHover(null)}
           onClick={() => onPick(m.id)}
