@@ -239,6 +239,17 @@ func SetupRouter(devMode bool, dataDir string) *gin.Engine {
 	if _, err := os.Stat("./web-app/dist/assets"); err == nil {
 		r.StaticFS("/assets", http.Dir("./web-app/dist/assets"))
 	}
+	// Site icons copied from web-app/public into the dist root; without
+	// explicit routes they would fall through to the SPA index.html.
+	for _, f := range []string{
+		"favicon.ico", "favicon-32.png", "apple-touch-icon.png",
+		"icon-192.png", "icon-512.png",
+	} {
+		p := filepath.Join("./web-app/dist", f)
+		if _, err := os.Stat(p); err == nil {
+			r.StaticFile("/"+f, p)
+		}
+	}
 	r.NoRoute(func(c *gin.Context) {
 		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
