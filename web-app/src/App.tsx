@@ -8,6 +8,8 @@ import SidePanel, { type SideTab } from './components/SidePanel';
 import ConfigOverlay from './components/ConfigOverlay';
 import SkinDialog from './components/SkinDialog';
 import { CURSOR_DESIGN } from './game/skin';
+import { setDebugTimeScale, getDebugTimeScale } from './game/debugTiming';
+import { captureTransition, downloadLastCapture, type CaptureOptions } from './game/transitionCapture';
 import GalleryScreen from './components/GalleryScreen';
 import MusicRoom from './components/MusicRoom';
 import DebugPanel from './components/DebugPanel';
@@ -31,7 +33,15 @@ export default function App() {
     voiceGain: sf.voiceGain || {},
   }));
   // Debug handle for browser-based soak testing.
-  useEffect(() => { (window as any).__lavender = runner; }, [runner]);
+  useEffect(() => {
+    (window as any).__lavender = {
+      ...runner,
+      setDebugTimeScale,
+      getDebugTimeScale,
+      captureTransition: (opts?: CaptureOptions) => captureTransition(runner, opts),
+      downloadLastCapture,
+    };
+  }, [runner]);
 
   // Dev-only BGM/engine debugger overlay (toggled with D, like G-senjou).
   const [debugOpen, setDebugOpen] = useState(false);

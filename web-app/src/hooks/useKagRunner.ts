@@ -11,6 +11,7 @@ import {
   getMeta,
 } from '../game/metadata';
 import type { EnvInit } from '../game/metadata';
+import { debugMs } from '../game/debugTiming';
 
 // ---------------------------------------------------------------------------
 // World state
@@ -516,7 +517,7 @@ export function useKagRunner(audio: {
               ...pc, visible: false, leaving: true,
               exitAnim: ch.exitAnim ?? { dx: 0, ms: 300, nonce: -1 },
             };
-            leavingTimersRef.current[name] = setTimeout(() => pruneLeaving(name), ms + 60);
+            leavingTimersRef.current[name] = setTimeout(() => pruneLeaving(name), debugMs(ms) + 60);
           }
         }
       }
@@ -990,7 +991,7 @@ export function useKagRunner(audio: {
       // No method (or explicit notrans): atomic cut.
       if (!method || method === 'notrans') {
         commitStage();
-        if (waitMs && !skipping) await sleep(waitMs);
+        if (waitMs && !skipping) await sleep(debugMs(waitMs));
         return 'continue';
       }
       const anim = transAnim(method);
@@ -998,7 +999,7 @@ export function useKagRunner(audio: {
       // 0 = slow (2x duration), 255 = instant (0x). Matches the engine's
       // drawspeed = (100-pos)/50 curve over the 0..200 slider range.
       const drawFactor = Math.max(0, Math.min(2, 2 - (sfRef.current.drawPos ?? 120) / 120 * 1));
-      const ms = Math.round((waitMs || anim.ms) * drawFactor);
+      const ms = Math.round(debugMs(waitMs || anim.ms) * drawFactor);
       const old = lastCommittedRef.current;
       commitStage(true); // reveal the new scene underneath
       if (!skipping) {
