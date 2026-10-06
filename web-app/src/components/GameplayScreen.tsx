@@ -325,9 +325,10 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
     stage, stageTransition, speaker, typewriterText, dialogueText, isWaiting, textVisible,
     advance, choiceOptions, chooseOption, video, onVideoEnded,
     isAutoMode, toggleAuto,
-    isFastForward, isSeeking, toggleFastForward, quickLoad, saveToSlot,
+    isFastForward, isSeeking, quickLoad, saveToSlot,
     windowHidden, setWindowHidden, sf,
     sideTab, setSideTab, setGameState, replayVoice, currentVoice,
+    startFastForward, stopFastForward,
     configOpen, setConfigOpen, requestConfirm,
   } = runner;
   const t = useT();
@@ -501,11 +502,26 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
                   if (await requestConfirm('タイトル')) setGameState('TITLE');
                   break;
                 case 'auto': toggleAuto(); break;
-                case 'skip': toggleFastForward(); break;
+                // skip is hold-to-run via pointer handlers below
+                case 'skip': break;
                 case 'voice': replayVoice(currentVoice); break;
                 case 'hide': setWindowHidden(true); break;
               }
             };
+            // Skip (▶▶) is hold-to-run, like the Control key.
+            const holdHandlers = b.id === 'skip' ? {
+              onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
+                e.preventDefault();
+                e.currentTarget.focus();
+                e.currentTarget.setPointerCapture(e.pointerId);
+                startFastForward();
+              },
+              onPointerUp: (e: React.PointerEvent<HTMLButtonElement>) => {
+                e.currentTarget.releasePointerCapture(e.pointerId);
+                stopFastForward();
+              },
+              onLostPointerCapture: () => stopFastForward(),
+            } : {};
             return (
               <button
                 key={b.id}
@@ -513,6 +529,7 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
                 style={{ left: b.x, width: b.w }}
                 title={b.kind === 'text' ? b.label : b.id}
                 onClick={e => { e.currentTarget.blur(); onSys(); }}
+                {...holdHandlers}
               >
                 {b.kind === 'text' ? b.label
                   : b.kind === 'voice' ? (

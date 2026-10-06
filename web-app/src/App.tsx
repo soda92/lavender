@@ -82,10 +82,8 @@ export default function App() {
   const openTab = (tab: SideTab) =>
     runner.setSideTab(runner.sideTab === tab ? null : tab);
 
-  // Chord tracking so Ctrl is treated as a skip toggle only when it was
-  // pressed AND released on this page without a combo (S/L/R). A Ctrl keyup
-  // after a Ctrl+R reload must not start skipping.
-  const ctrlHeldRef = useRef(false);
+  // Ctrl = hold-to-skip. Chord tracking suppresses skip while it is part
+  // of a combo (Ctrl+S / Ctrl+L); a keyup after Ctrl+R must not skip.
   const ctrlComboRef = useRef(false);
 
   // Keyboard shortcuts
@@ -118,18 +116,22 @@ export default function App() {
           runner.setSf((prev: any) => ({ ...prev, immerseMode: !prev.immerseMode }));
           break;
         case 'Control':
-          ctrlHeldRef.current = true;
-          ctrlComboRef.current = false;
+          // Key repeats must not re-arm skip after the driver auto-stops
+          // (e.g. READ_ONLY at an unread line) while the key stays held.
+          if (!e.repeat) {
+            ctrlComboRef.current = false;
+            runner.startFastForward();
+          }
           break;
         case 'Escape':
           if (runner.sideTab) runner.setSideTab(null);
           else runner.setConfigOpen(true);
           break;
         case 's': case 'S':
-          if (e.ctrlKey) { ctrlComboRef.current = true; runner.saveToSlot('q'); }
+          if (e.ctrlKey) { ctrlComboRef.current = true; runner.stopFastForward(); runner.saveToSlot('q'); }
           break;
         case 'l': case 'L':
-          if (e.ctrlKey) { ctrlComboRef.current = true; runner.quickLoad(); }
+          if (e.ctrlKey) { ctrlComboRef.current = true; runner.stopFastForward(); runner.quickLoad(); }
           break;
         case 'j': case 'J':
           runner.toggleAuto(); break;
@@ -140,26 +142,25 @@ export default function App() {
           openTab('navigator');
           break;
         default:
-          if (e.ctrlKey) ctrlComboRef.current = true;
+          if (e.ctrlKey) { ctrlComboRef.current = true; runner.stopFastForward(); }
           break;
       }
     };
-    const onCtrl = (e: KeyboardEvent) => {
+    const onCtrlUp = (e: KeyboardEvent) => {
       if (e.key !== 'Control') return;
-      const held = ctrlHeldRef.current;
-      const combo = ctrlComboRef.current;
-      ctrlHeldRef.current = false;
       ctrlComboRef.current = false;
-      // Only a bare Control press/release on this page toggles skip.
-      if (held && !combo && runner.gameState === 'PLAYING') runner.toggleFastForward();
+      runner.stopFastForward();
     };
-    const onBlur = () => { ctrlHeldRef.current = false; ctrlComboRef.current = false; };
+    const onBlur = () => {
+      ctrlComboRef.current = false;
+      runner.stopFastForward();
+    };
     window.addEventListener('keydown', onKey);
-    window.addEventListener('keyup', onCtrl);
+    window.addEventListener('keyup', onCtrlUp);
     window.addEventListener('blur', onBlur);
     return () => {
       window.removeEventListener('keydown', onKey);
-      window.removeEventListener('keyup', onCtrl);
+      window.removeEventListener('keyup', onCtrlUp);
       window.removeEventListener('blur', onBlur);
     };
   }, [runner]);

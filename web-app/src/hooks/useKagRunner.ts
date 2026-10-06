@@ -1753,6 +1753,22 @@ export function useKagRunner(audio: {
     }
   }, []);
 
+  // Hold-to-skip: idempotent start/stop used by the Control key and the
+  // pointer-held skip button (K remains a press-toggle).
+  const startFastForward = useCallback(() => {
+    if (fastRef.current || gameState !== 'PLAYING') return;
+    fastRef.current = true;
+    setIsFastForward(true);
+    setIsAutoMode(false);
+    autoRef.current = false;
+  }, [gameState]);
+
+  const stopFastForward = useCallback(() => {
+    if (!fastRef.current) return;
+    fastRef.current = false;
+    setIsFastForward(false);
+  }, []);
+
   // auto / skip driver
   useEffect(() => {
     if (gameState !== 'PLAYING') return;
@@ -1960,7 +1976,7 @@ export function useKagRunner(audio: {
     showMusic, setShowMusic,
     scenarioInstructions, seekToPointer,
     isAutoMode, toggleAuto,
-    isFastForward, toggleFastForward,
+    isFastForward, toggleFastForward, startFastForward, stopFastForward,
     language, setLanguage,
     f, setF, sf: sfState, setSf, tf,
     startNewGame, returnToTitle, loadScenario, loadSaveSlot, saveToSlot, quickLoad, deleteSlot,

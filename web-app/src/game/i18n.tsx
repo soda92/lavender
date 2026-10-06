@@ -49,8 +49,8 @@ const dict = {
     en: 'English (falls back to Japanese)',
   },
   'settings.shortcuts': {
-    ja: 'ショートカット：Enter 次へ / Space ウィンドウ消去 / I 没入モード / J オート / K スキップ / Ctrl+S クイックセーブ / Ctrl+L ロード',
-    en: 'Shortcuts: Enter advance · Space hide window · I immersive · J auto · K skip · Ctrl+S quick save · Ctrl+L load',
+    ja: 'ショートカット：Enter 次へ / Space ウィンドウ消去 / I 没入モード / J オート / K スキップ切替 / Ctrl 長押しスキップ / Ctrl+S クイックセーブ / Ctrl+L ロード',
+    en: 'Shortcuts: Enter advance · Space hide window · I immersive · J auto · K skip toggle · hold Ctrl to skip · Ctrl+S quick save · Ctrl+L load',
   },
   'settings.returnTitle': { ja: 'タイトルに戻る', en: 'Return to Title' },
   'settings.returnTitleWarn': {
