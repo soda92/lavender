@@ -4,6 +4,9 @@ import {
   renderCharacter,
   findLabelIndex,
   stageStem,
+  resolveCharDisp,
+  allcharHideDisp,
+  charBodyVisible,
   __setManifestsForTest,
 } from './metadata';
 import envinit from '../../../extracted_data/envinit.json';
@@ -99,5 +102,54 @@ describe('stageStem', () => {
     const s = stageStem('空雨', '夜');
     expect(typeof s).toBe('string');
     expect(s.length).toBeGreaterThan(0);
+  });
+});
+
+describe('resolveCharDisp — KAGEnvImage disposition state machine', () => {
+  it('explicit tokens override any current state', () => {
+    for (const d of ['both', 'face', 'clear', 'invisible'] as const) {
+      expect(resolveCharDisp(d, 'both', true)).toBe('both');
+      expect(resolveCharDisp(d, 'face', true)).toBe('face');
+      expect(resolveCharDisp(d, 'clear', true)).toBe('clear');
+      expect(resolveCharDisp(d, 'invisible', true)).toBe('invisible');
+    }
+  });
+
+  it('CLEAR + a touching tag auto-re-shows as BOTH', () => {
+    expect(resolveCharDisp('clear', null, true)).toBe('both');
+  });
+
+  it('INVISIBLE stays suppressed even when a pose tag touches', () => {
+    expect(resolveCharDisp('invisible', null, true)).toBe('invisible');
+  });
+
+  it('FACE is preserved by bare pose tags (bust stays, no body)', () => {
+    expect(resolveCharDisp('face', null, true)).toBe('face');
+    expect(resolveCharDisp('both', null, true)).toBe('both');
+    expect(resolveCharDisp('bu', null, true)).toBe('bu');
+  });
+
+  it('untouched tags never change disposition', () => {
+    for (const d of ['both', 'bu', 'face', 'clear', 'invisible'] as const) {
+      expect(resolveCharDisp(d, null, false)).toBe(d);
+    }
+  });
+
+  it('reproduces the lave34 FACE exchange after allchar hide', () => {
+    // allchar hide clears body chars but must leave FACE busts alone.
+    expect(allcharHideDisp('both')).toBe('clear');
+    expect(allcharHideDisp('bu')).toBe('clear');
+    expect(allcharHideDisp('face')).toBeNull();
+    expect(allcharHideDisp('clear')).toBeNull();
+    expect(allcharHideDisp('invisible')).toBeNull();
+    // Six chars addressed by 顔 after the hide stay FACE through their bare
+    // pose/face-update tags; no bodies come back until an explicit 出.
+    let disp: any = 'clear';
+    disp = resolveCharDisp(disp, 'face', true);   // 顔
+    for (let i = 0; i < 5; i++) disp = resolveCharDisp(disp, null, true);
+    expect(disp).toBe('face');
+    expect(charBodyVisible(disp)).toBe(false);
+    disp = resolveCharDisp(disp, 'both', true);   // 出 after the scene
+    expect(charBodyVisible(disp)).toBe(true);
   });
 });

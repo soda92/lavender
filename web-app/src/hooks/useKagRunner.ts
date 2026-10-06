@@ -9,15 +9,17 @@ import {
   scenarioPath,
   findLabelIndex,
   getMeta,
+  resolveCharDisp,
+  allcharHideDisp,
+  charBodyVisible,
 } from '../game/metadata';
-import type { EnvInit } from '../game/metadata';
+import type { EnvInit, CharDisp } from '../game/metadata';
+export type { CharDisp } from '../game/metadata';
 import { debugMs } from '../game/debugTiming';
 
 // ---------------------------------------------------------------------------
 // World state
 // ---------------------------------------------------------------------------
-
-export type CharDisp = 'both' | 'bu' | 'face' | 'clear' | 'invisible';
 
 export interface CharState {
   name: string;
@@ -860,15 +862,8 @@ export function useKagRunner(audio: {
     if (args.opacity != null) ch.opacity = parseInt(String(args.opacity), 10) || 0;
     if (args.xpos != null) ch.xpos = parseInt(String(args.xpos), 10) || 0;
     if (!ch.diff) ch.diff = '基本';
-    if (explicitDisp) {
-      ch.disp = explicitDisp;
-    } else if (touched && ch.disp === 'clear') {
-      // Engine SHOW auto-select: a pose/dress/face/position tag while CLEAR
-      // brings the body back (BOTH); INVISIBLE stays suppressed; an existing
-      // FACE disposition is kept (the tag only refreshes the bust art).
-      ch.disp = 'both';
-    }
-    ch.visible = ch.disp === 'both' || ch.disp === 'bu';
+    ch.disp = resolveCharDisp(ch.disp, explicitDisp, touched);
+    ch.visible = charBodyVisible(ch.disp);
 
     // Named per-layer transition (スライド出/消 etc.): drives a slide/fade
     // in the view. Suppressed during seek replay / fast forward (engine
@@ -1227,13 +1222,13 @@ export function useKagRunner(audio: {
       if (hide) {
         for (const ch of Object.values(world.chars)) {
           if (name === 'allchar') {
-            // Engine re-emits the tag only for body-showing (BOTH/BU) chars;
-            // FACE-only busts are left alone.
-            if (ch.disp === 'both' || ch.disp === 'bu') ch.disp = 'clear';
+            // Engine re-emits the tag only to body-showing chars; FACE busts
+            // and already-hidden chars are left untouched.
+            const next = allcharHideDisp(ch.disp);
+            if (next) ch.disp = next;
           } else {
             ch.disp = 'clear';
           }
-          // All remaining dispositions (clear/invisible/face) are body-off.
           ch.visible = false;
         }
       }

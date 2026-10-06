@@ -245,8 +245,47 @@ export function classifyToken(charName: string, token: string): TokenKind {
   return 'unknown';
 }
 
-export function resolveRegisteredName(name: string): string {
-  const m = cache;
+/**
+ * KAGEnvImage character disposition (envinit DISPPOSITION):
+ * both/bu = body on stage; face = message-window bust only; clear = erased
+ * (a later pose/position tag auto re-shows); invisible = suppressed.
+ */
+export type CharDisp = 'both' | 'bu' | 'face' | 'clear' | 'invisible';
+
+/**
+ * Engine disp resolution for one character tag.
+ * @param current  current disposition
+ * @param explicit disposition carried by an explicit 出/立/顔/消/無 token
+ * @param touched  the tag changed pose/dress/diff/face/xpos/level
+ *
+ * With no explicit token the engine SHOW auto-select keeps the current
+ * disposition, except a CLEAR layer touched by the tag becomes BOTH;
+ * INVISIBLE stays suppressed and FACE keeps the face-window state.
+ */
+export function resolveCharDisp(
+  current: CharDisp,
+  explicit: CharDisp | null,
+  touched: boolean,
+): CharDisp {
+  if (explicit) return explicit;
+  if (touched && current === 'clear') return 'both';
+  return current;
+}
+
+/**
+ * [allchar hide] re-emits the hide tag only to body-showing layers, so
+ * BOTH/BU become CLEAR while FACE busts and already-hidden chars are left
+ * alone. Returns the new disposition, or null when the char is untouched.
+ */
+export function allcharHideDisp(current: CharDisp): CharDisp | null {
+  return current === 'both' || current === 'bu' ? 'clear' : null;
+}
+
+export function charBodyVisible(disp: CharDisp): boolean {
+  return disp === 'both' || disp === 'bu';
+}
+
+export function resolveRegisteredName(name: string): string {  const m = cache;
   if (!m) return name;
   if (m.charmeta.characters[name]) return name;
   // Runtime aliases registered by [newchar] (def.nameAlias points at the
