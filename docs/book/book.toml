@@ -1,0 +1,20 @@
+[book]
+title = "Lavender — Architecture & Engine Notes"
+authors = ["lavender contributors"]
+language = "en"
+src = "src"
+
+[build]
+build-dir = "html"
+create-missing = false
+
+[output.html]
+default-theme = "navy"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/local/lavender"
+edit-url-template = ""
+no-section-label = true
+
+[output.html.fold]
+enable = true
+level = 1
