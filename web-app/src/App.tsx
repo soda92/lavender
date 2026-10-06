@@ -184,7 +184,11 @@ export default function App() {
           />
         )}
         {runner.gameState === 'MUSIC' && (
-          <MusicRoom onBack={() => runner.setGameState('TITLE')} audio={audio} />
+          <MusicRoom
+            onBack={() => runner.setGameState('TITLE')}
+            audio={audio}
+            seen={runner.sf?.bgmSeen || {}}
+          />
         )}
 
       </div>

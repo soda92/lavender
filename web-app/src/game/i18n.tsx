@@ -106,8 +106,13 @@ const dict = {
 
   'music.title': { ja: '音楽鑑賞', en: 'Music Room' },
   'music.trackCount': { ja: '{n} 曲', en: '{n} tracks' },
+  'music.unlocked': { ja: '聴取済み {n} / {total}', en: 'Heard {n} / {total}' },
   'music.play': { ja: '再生', en: 'Play' },
+  'music.pause': { ja: '一時停止', en: 'Pause' },
   'music.stop': { ja: '停止', en: 'Stop' },
+  'music.prev': { ja: '前の曲', en: 'Previous' },
+  'music.next': { ja: '次の曲', en: 'Next' },
+  'music.nowPlaying': { ja: '再生中', en: 'Now Playing' },
 } as const;
 
 export type TKey = keyof typeof dict;
