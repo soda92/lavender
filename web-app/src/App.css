@@ -296,8 +296,7 @@ html, body, #root {
   margin-bottom: 12px;
 }
 .modal-head h2 { margin: 0; font-size: 20px; letter-spacing: 4px; }
-.modal-head button, .settings-row button, .save-actions button,
-.extras-head button, .music-row button {
+.modal-head button, .settings-row button, .save-actions button {
   color: var(--ink);
   background: #3c2f60;
   border: 1px solid var(--accent);
@@ -305,8 +304,7 @@ html, body, #root {
   padding: 4px 14px;
   cursor: var(--cur-over, pointer);
 }
-.modal-head button:hover, .save-actions button:hover, .extras-head button:hover,
-.music-row button:hover { background: #5a408c; }
+.modal-head button:hover, .save-actions button:hover { background: #5a408c; }
 button.danger { border-color: #b4555f; background: #4d2830; }
 
 /* history */
@@ -417,7 +415,6 @@ button.danger { border-color: #b4555f; background: #4d2830; }
 }
 
 /* thin dark scrollbars for in-stage scroll areas */
-.music-list,
 .side-body,
 .history-list,
 .archives-list,
@@ -425,12 +422,10 @@ button.danger { border-color: #b4555f; background: #4d2830; }
   scrollbar-width: thin;
   scrollbar-color: rgba(157, 123, 216, 0.5) transparent;
 }
-.music-list::-webkit-scrollbar,
 .side-body::-webkit-scrollbar,
 .history-list::-webkit-scrollbar,
 .archives-list::-webkit-scrollbar,
 .navigator-preview::-webkit-scrollbar { width: 8px; height: 8px; }
-.music-list::-webkit-scrollbar-thumb,
 .side-body::-webkit-scrollbar-thumb,
 .history-list::-webkit-scrollbar-thumb,
 .archives-list::-webkit-scrollbar-thumb,
@@ -438,25 +433,10 @@ button.danger { border-color: #b4555f; background: #4d2830; }
   background: rgba(157, 123, 216, 0.5);
   border-radius: 4px;
 }
-.music-list::-webkit-scrollbar-track,
 .side-body::-webkit-scrollbar-track,
 .history-list::-webkit-scrollbar-track,
 .archives-list::-webkit-scrollbar-track,
 .navigator-preview::-webkit-scrollbar-track { background: transparent; }
-
-/* ---------- extras ---------- */
-.extras-screen {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, #0b0816, #1a1330);
-  display: flex;
-  flex-direction: column;
-  padding: 20px 28px;
-}
-.extras-head { display: flex; align-items: center; gap: 18px; margin-bottom: 16px; }
-.extras-head h2 { margin: 0; letter-spacing: 4px; }
-.extras-count { opacity: 0.6; font-size: 13px; }
-.extras-head button { margin-left: auto; }
 
 /* ---------- CG / scene recollection album (cgmemory.csv skin) ---------- */
 .cgmem {
@@ -532,6 +512,7 @@ button.danger { border-color: #b4555f; background: #4d2830; }
   position: absolute; padding: 0; margin: 0;
   background: none; border: none;
   cursor: pointer;
+  pointer-events: auto;
 }
 .cgmem-cell.locked { cursor: default; }
 /* locked scene cards still launch the recollection (playing unlocks) */
@@ -668,93 +649,85 @@ button.danger { border-color: #b4555f; background: #4d2830; }
 .cg-viewer-bar button:disabled { opacity: 0.35; cursor: default; }
 .cg-viewer-bar button:not(:disabled):hover { background: rgba(157,123,216,0.35); }
 
-.music-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding-right: 6px; }
-.music-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 7px 12px;
-  border-radius: 8px;
-  border-left: 3px solid transparent;
-  cursor: var(--cur-over, pointer);
-  transition: background 0.15s;
+/* ---------- sound mode (sound.csv paper skin) ---------- */
+.cgmem-sheet { position: absolute; pointer-events: none; }
+.sound-row {
+  position: absolute; padding: 0; margin: 0;
+  background: none; border: none;
+  display: flex; align-items: center;
+  cursor: pointer;
 }
-.music-row:hover { background: rgba(255, 255, 255, 0.06); }
-.music-row.playing {
-  background: rgba(157, 123, 216, 0.2);
-  border-left-color: rgba(208, 127, 176, 0.9);
+.sound-row.locked { cursor: default; }
+.sound-row-f { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.sound-row-f.hov, .sound-row-f.cur { opacity: 0; }
+.sound-row:not(.locked):not(.on):hover .sound-row-f.hov { opacity: 1; }
+.sound-row.on .sound-row-f.cur { opacity: 1; }
+.sound-row-title {
+  position: absolute;
+  left: 50px; right: 12px;
+  text-align: center;
+  font-size: 15px; letter-spacing: 2px;
+  color: #4a4458;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none;
 }
-.music-row.locked { cursor: var(--cur-normal, default); opacity: 0.5; }
-.music-row.locked:hover { background: none; }
-.music-num {
-  width: 26px;
-  text-align: right;
-  font-size: 12px;
-  opacity: 0.55;
-  font-variant-numeric: tabular-nums;
-}
-.music-mark { width: 16px; text-align: center; font-size: 13px; opacity: 0.8; }
-.music-info { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.music-title { font-size: 14px; letter-spacing: 1px; }
-.music-stem { font-size: 10px; opacity: 0.45; font-family: monospace; letter-spacing: 1px; }
+.sound-row.on .sound-row-title { color: #fff; }
+.sound-row.locked .sound-row-title { color: #b3aebc; letter-spacing: 8px; }
 
-/* equalizer indicator for the playing row */
-.music-eq {
-  width: 16px; height: 14px;
+/* modern transport panel in the empty right half of the sound sheet */
+.sound-panel {
+  position: absolute; left: 455px; top: 150px; width: 296px;
+  display: flex; flex-direction: column; gap: 9px;
+  background: #f6f3fb;
+  border: 1px solid #c3b6dd; border-radius: 6px;
+  box-shadow: 0 4px 18px rgba(90, 70, 130, 0.18);
+  padding: 16px 18px 14px;
+  font-family: "Yu Mincho", "Hiragino Mincho ProN", "MS Mincho", serif;
+  color: #4a4458;
+}
+.sound-panel-label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; letter-spacing: 3px; opacity: 0.65;
+}
+.sound-panel-title { font-size: 17px; letter-spacing: 1px; }
+.sound-panel-stem { font-size: 10px; opacity: 0.5; font-family: monospace; }
+.sound-panel-eq {
+  width: 16px; height: 13px;
   display: flex; align-items: flex-end; justify-content: center; gap: 2px;
 }
-.music-eq i {
-  width: 3px; background: #d07fb0; border-radius: 1px;
-  animation: music-eq 0.9s ease-in-out infinite;
-}
-.music-eq i:nth-child(1) { height: 60%; animation-delay: -0.4s; }
-.music-eq i:nth-child(2) { height: 100%; animation-delay: -0.2s; }
-.music-eq i:nth-child(3) { height: 40%; }
-@keyframes music-eq {
+.sound-panel-eq i { width: 3px; background: #9d7bd8; animation: sound-eq 0.9s ease-in-out infinite; }
+.sound-panel-eq i:nth-child(1) { height: 60%; animation-delay: -0.4s; }
+.sound-panel-eq i:nth-child(2) { height: 100%; animation-delay: -0.2s; }
+.sound-panel-eq i:nth-child(3) { height: 40%; }
+@keyframes sound-eq {
   0%, 100% { transform: scaleY(0.4); }
   50% { transform: scaleY(1); }
 }
-
-/* bottom player bar */
-.music-player {
-  margin-top: 12px;
-  padding: 10px 16px;
-  background: rgba(20, 14, 38, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  gap: 18px;
+.sound-times {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; font-variant-numeric: tabular-nums;
+  margin-top: 8px;
 }
-.music-now {
-  display: flex; flex-direction: column; gap: 2px;
-  min-width: 200px; max-width: 260px;
-}
-.music-now-label { font-size: 10px; letter-spacing: 2px; opacity: 0.5; }
-.music-now-title {
-  font-size: 14px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.music-now-stem { font-size: 10px; opacity: 0.45; font-family: monospace; }
-.music-transport { flex: 1; display: flex; flex-direction: column; gap: 6px; }
-.music-times { display: flex; align-items: center; gap: 10px; font-size: 11px; opacity: 0.75; font-variant-numeric: tabular-nums; }
-.music-seek { flex: 1; accent-color: #9d7bd8; cursor: var(--cur-over, pointer); }
-.music-seek:disabled { cursor: var(--cur-normal, default); opacity: 0.4; }
-.music-buttons { display: flex; gap: 8px; justify-content: flex-end; }
-.music-btn {
-  width: 34px; height: 30px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-  color: var(--ink);
-  font-size: 13px;
-  cursor: var(--cur-over, pointer);
+.sound-seek { flex: 1; accent-color: #9d7bd8; cursor: pointer; }
+.sound-seek:disabled { cursor: default; opacity: 0.4; }
+.sound-buttons { display: flex; gap: 10px; justify-content: center; margin-top: 2px; }
+.sound-buttons button {
+  width: 36px; height: 30px;
+  background: rgba(255,255,255,0.85);
+  border: 1px solid #c3b6dd; border-radius: 6px;
+  color: #5d5079; font-size: 13px;
+  cursor: pointer;
   transition: background 0.15s;
 }
-.music-btn:hover:not(:disabled) { background: rgba(157, 123, 216, 0.4); }
-.music-btn:disabled { opacity: 0.3; cursor: var(--cur-normal, default); }
-.music-btn-main { background: linear-gradient(135deg, rgba(208,127,176,0.55), rgba(157,123,216,0.55)); width: 46px; }
-.music-btn-main:hover:not(:disabled) { filter: brightness(1.15); }
+.sound-buttons button:hover:not(:disabled) { background: #e7dcf7; }
+.sound-buttons button:disabled { opacity: 0.35; cursor: default; }
+.sound-buttons button.main {
+  width: 50px;
+  color: #fff;
+  background: linear-gradient(135deg, rgba(208,127,176,0.75), rgba(157,123,216,0.75));
+  border-color: #b3a1d4;
+}
+.sound-buttons button.main:hover:not(:disabled) { filter: brightness(1.12); }
 
 /* ---- begintrans/endtrans scene transitions ---- */
 .trans-overlay {

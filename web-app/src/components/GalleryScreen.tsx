@@ -5,13 +5,22 @@ import {
   overlayUrl, type CgSection, type CgTile, type CgVariant,
 } from '../game/cgGroups';
 import { isSceneUnlocked, sortScenes, type SceneEntry } from '../game/scenes';
-import { CG_MEMORY } from '../game/skin';
+import { CG_MEMORY, SOUND_SKIN } from '../game/skin';
+import SoundMode from './SoundMode';
+
+export type GalleryMode = 'cg' | 'scenes' | 'music';
+
+interface AudioLike {
+  playBgm: (s: string) => void;
+  stopBgm: () => void;
+  bgmPlayer: HTMLAudioElement;
+}
 
 interface Props {
   sf: Record<string, any>;
   onBack: () => void;
-  onMusic?: () => void;
-  initialViewMode?: 'cg' | 'scenes';
+  audio: AudioLike;
+  initialViewMode?: GalleryMode;
   onPlayScene?: (scene: SceneEntry) => void;
 }
 
@@ -22,9 +31,9 @@ const pos = (r: { x: number; y: number; w?: number; h: number }) => ({
   left: r.x, top: r.y, width: r.w, height: r.h,
 });
 
-const GalleryScreen: React.FC<Props> = ({ sf, onBack, onMusic, initialViewMode = 'cg', onPlayScene }) => {
+const GalleryScreen: React.FC<Props> = ({ sf, onBack, audio, initialViewMode = 'cg', onPlayScene }) => {
   const t = useT();
-  const [mode, setMode] = useState<'cg' | 'scenes'>(initialViewMode);
+  const [mode, setMode] = useState<GalleryMode>(initialViewMode);
   const [sections, setSections] = useState<CgSection[]>([]);
   const [scenes, setScenes] = useState<SceneEntry[]>([]);
   const [tab, setTab] = useState<string>('all');
@@ -141,23 +150,45 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack, onMusic, initialViewMode =
     });
 
   const modeBtn = CG_MEMORY.modeBtn;
-  const switchButtons = mode === 'cg'
-    ? [{ skin: CG_MEMORY.toScene, go: () => setMode('scenes'), idx: 0 },
-       { skin: CG_MEMORY.toSound, go: () => onMusic?.(), idx: 1 }]
-    : [{ skin: CG_MEMORY.toCg, go: () => setMode('cg'), idx: 0 },
-       { skin: CG_MEMORY.toSound, go: () => onMusic?.(), idx: 1 }];
+  // Each mode shows tiles switching to the OTHER two; the sound screen uses
+  // its own sound.csv button art (same geometry).
+  const switchButtons =
+    mode === 'cg' ? [
+      { skin: CG_MEMORY.toScene, go: () => setMode('scenes'), idx: 0 },
+      { skin: CG_MEMORY.toSound, go: () => setMode('music'), idx: 1 },
+    ] : mode === 'scenes' ? [
+      { skin: CG_MEMORY.toCg, go: () => setMode('cg'), idx: 0 },
+      { skin: CG_MEMORY.toSound, go: () => setMode('music'), idx: 1 },
+    ] : [
+      { skin: SOUND_SKIN.toScene, go: () => setMode('scenes'), idx: 0 },
+      { skin: SOUND_SKIN.toCg, go: () => setMode('cg'), idx: 1 },
+    ];
+
+  const goBack = () => {
+    if (mode === 'music') audio.stopBgm();
+    onBack();
+  };
 
   return (
     <div className="cgmem">
-      <img className="cgmem-base" src={CG_MEMORY.base} alt="" draggable={false} />
-
-      {/* Title */}
       <img
-        className="cgmem-title"
-        src={mode === 'cg' ? CG_MEMORY.titleCg : CG_MEMORY.titleScene}
-        style={pos(mode === 'cg' ? CG_MEMORY.titleRects.cg : CG_MEMORY.titleRects.scene)}
+        className="cgmem-base"
+        src={mode === 'music' ? SOUND_SKIN.base : CG_MEMORY.base}
         alt="" draggable={false}
       />
+
+      {/* Title */}
+      {mode === 'music' ? (
+        <img className="cgmem-title" src={SOUND_SKIN.title}
+          style={pos(SOUND_SKIN.titleRect)} alt="" draggable={false} />
+      ) : (
+        <img
+          className="cgmem-title"
+          src={mode === 'cg' ? CG_MEMORY.titleCg : CG_MEMORY.titleScene}
+          style={pos(mode === 'cg' ? CG_MEMORY.titleRects.cg : CG_MEMORY.titleRects.scene)}
+          alt="" draggable={false}
+        />
+      )}
 
       {/* Mode switches */}
       {switchButtons.map((b, i) => (
@@ -176,13 +207,16 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack, onMusic, initialViewMode =
       <button
         className="cgmem-back"
         style={pos(CG_MEMORY.backRect)}
-        onClick={onBack}
+        onClick={goBack}
         title={t('gallery.toTitle')}
       >
-        <img src={CG_MEMORY.back.off} alt="" draggable={false} />
-        <img src={CG_MEMORY.back.over} alt="" draggable={false} className="hov" />
+        <img src={mode === 'music' ? SOUND_SKIN.back.off : CG_MEMORY.back.off} alt="" draggable={false} />
+        <img src={mode === 'music' ? SOUND_SKIN.back.over : CG_MEMORY.back.over} alt="" draggable={false} className="hov" />
       </button>
 
+      {mode === 'music' ? (
+        <SoundMode audio={audio} seen={sf.bgmSeen} />
+      ) : (<>
       {/* All view toggle (no shipped bitmap; sits by the pager rule) */}
       <button
         className={`cgmem-all ${tab === 'all' ? 'on' : ''}`}
@@ -327,6 +361,7 @@ const GalleryScreen: React.FC<Props> = ({ sf, onBack, onMusic, initialViewMode =
       )}
 
       <span className="cgmem-count">{currentCount.unlocked} / {currentCount.total}</span>
+      </>)}
 
       {/* Fullscreen variant viewer */}
       {viewer && cur && (

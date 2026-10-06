@@ -95,7 +95,7 @@ export interface HistoryItem {
   pointer: number;
 }
 
-type GameState = 'TITLE' | 'PLAYING' | 'SETTINGS' | 'GALLERY' | 'MUSIC';
+type GameState = 'TITLE' | 'PLAYING' | 'SETTINGS' | 'GALLERY';
 
 interface SaveSlot {
   currentScenario: string;
@@ -351,7 +351,7 @@ export function useKagRunner(audio: {
   const lastEventSlotRef = useRef<'__event__' | '__event_l__'>('__event__');
   const [sceneReplay, setSceneReplay] =
     useState<{ storage: string; endLabel: string } | null>(null);
-  const [galleryViewMode, setGalleryViewMode] = useState<'cg' | 'scenes'>('cg');
+  const [galleryViewMode, setGalleryViewMode] = useState<'cg' | 'scenes' | 'music'>('cg');
   // Indirection so the []-dep runSlice always calls the latest finisher.
   const finishSceneReplayRef = useRef<() => void>(() => {});
 

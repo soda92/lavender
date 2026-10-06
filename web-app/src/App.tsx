@@ -11,7 +11,6 @@ import { CURSOR_DESIGN, CURSOR_OVER, CURSOR_HOTSPOT } from './game/skin';
 import { setDebugTimeScale, getDebugTimeScale } from './game/debugTiming';
 import { captureTransition, downloadLastCapture, type CaptureOptions } from './game/transitionCapture';
 import GalleryScreen from './components/GalleryScreen';
-import MusicRoom from './components/MusicRoom';
 import DebugPanel from './components/DebugPanel';
 import { useT } from './game/i18n';
 
@@ -203,16 +202,9 @@ export default function App() {
           <GalleryScreen
             sf={runner.sf}
             onBack={() => runner.setGameState('TITLE')}
-            onMusic={() => runner.setGameState('MUSIC')}
+            audio={audio}
             initialViewMode={runner.galleryViewMode}
             onPlayScene={runner.startSceneReplay}
-          />
-        )}
-        {runner.gameState === 'MUSIC' && (
-          <MusicRoom
-            onBack={() => runner.setGameState('TITLE')}
-            audio={audio}
-            seen={runner.sf?.bgmSeen || {}}
           />
         )}
 

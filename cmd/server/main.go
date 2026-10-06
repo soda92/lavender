@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-gonic/gin"
+
 	"lavender/lib/extraction"
 	"lavender/pkg/db"
 	"lavender/pkg/handlers"
@@ -76,25 +78,12 @@ func main() {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
-	var devCmd *exec.Cmd
+	var viteSup *viteSupervisor
 	if *devMode {
 		fmt.Printf("Starting Vite dev server with BACKEND_PORT=%d...\n", effectivePort)
-		if runtime.GOOS == "windows" {
-			devCmd = exec.Command("cmd", "/c", "pnpm", "dev")
-		} else {
-			devCmd = exec.Command("pnpm", "dev")
-		}
-		devCmd.Dir = "./web-app"
-		devCmd.Env = append(os.Environ(), fmt.Sprintf("BACKEND_PORT=%d", effectivePort))
-		devCmd.Stdout = os.Stdout
-		devCmd.Stderr = os.Stderr
-		if runtime.GOOS != "windows" {
-			devCmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-		}
-		if err := devCmd.Start(); err != nil {
+		viteSup = newViteSupervisor(effectivePort)
+		if err := viteSup.Start(); err != nil {
 			log.Printf("Warning: failed to start pnpm dev: %v", err)
-		} else {
-			go func() { _ = devCmd.Wait() }()
 		}
 	}
 
@@ -103,6 +92,20 @@ func main() {
 	frontendURL := fmt.Sprintf("http://localhost:%d", effectivePort)
 	if *devMode {
 		frontendURL = "http://localhost:38942"
+	}
+	if *devMode && viteSup != nil {
+		// Dev convenience: restart the wedged Vite child (HMR/module cache)
+		// without relaunching the Go server.
+		router.POST("/api/dev/restart-vite", func(c *gin.Context) {
+			pid, err := viteSup.Restart()
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "error": err.Error()})
+				return
+			}
+
+			ready := waitForViteReady(frontendURL, 12*time.Second)
+			c.JSON(http.StatusOK, gin.H{"ok": ready, "pid": pid, "url": frontendURL})
+		})
 	}
 	fmt.Printf("Server listening on %s\n", frontendURL)
 
@@ -122,12 +125,8 @@ func main() {
 	go func() {
 		<-quit
 		log.Println("Shutting down...")
-		if devCmd != nil && devCmd.Process != nil {
-			if runtime.GOOS != "windows" {
-				_ = syscall.Kill(-devCmd.Process.Pid, syscall.SIGKILL)
-			} else {
-				_ = devCmd.Process.Kill()
-			}
+		if viteSup != nil {
+			viteSup.Stop()
 		}
 		os.Exit(0)
 	}()

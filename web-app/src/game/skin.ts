@@ -256,6 +256,33 @@ export const CG_MEMORY = {
   pager: { x: 246, y: 545, w: 31, h: 35, pitch: 40, groupSize: 4 },
 } as const;
 
+// ---------------------------------------------------------------------------
+// sound.csv — music room (same paper-album family, 800x600 stage).
+// ---------------------------------------------------------------------------
+
+const snd = (tail: string) => uipsd(`sound@${tail}.png`);
+
+export const SOUND_SKIN = {
+  base: snd('背景%base'),
+  title: snd('音楽鑑賞%layer'),
+  titleRect: { x: 37, y: 31, w: 229, h: 61 },
+  toScene: { off: snd('シーン鑑賞へ%button;off'), over: snd('シーン鑑賞へ%button;over') },
+  toCg: { off: snd('画像鑑賞へ%button;off'), over: snd('画像鑑賞へ%button;over') },
+  back: { off: snd('戻る%button;off'), over: snd('戻る%button;over') },
+  // numbered list sheets: layer;1 = 01..20, layer;2 = 21..40 (35 tracks)
+  sheet: { x: 33, y: 141, w: 393, h: 369, layers: [
+    snd('page%layer;1'), snd('page%layer;2'), snd('page%layer;3'),
+  ] },
+  // 20 rows per page: two columns of 10, 366x35 at (27,128)/(406,128)
+  row: { w: 366, h: 35, cols: [27, 406], y0: 128, pitch: 40, perCol: 10 },
+  rowOff: snd('データ%button;off'),
+  rowOver: snd('データ%button;over'),
+  rowOn: snd('データ%button;on'),
+  perPage: 20,
+  // pager slots at x36/76/116 (35 tracks -> 2 pages)
+  pager: { x: 46, y: 545, w: 31, h: 35, pitch: 40, slotOffset: -10, groupSize: 3 },
+} as const;
+
 export const SYS_BAR_Y = 580;
 
 export const SYS_BUTTONS = [
