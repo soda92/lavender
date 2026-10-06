@@ -4,6 +4,7 @@ import { paintSpriteComposite, paintSpriteFace } from '../game/spriteComposite';
 import { SKIN, SKIN2, SYS_BUTTONS } from '../game/skin';
 import { useT } from '../game/i18n';
 import { useDebugTimeScale } from '../game/debugTiming';
+import { resolveShownFrame, frameIsPositioned, type ReadyFrame } from '../game/dynLayerFrame';
 import type { StageState, CharState, DynLayer, LayerPosTrack, LayerOpTrack } from '../hooks/useKagRunner';
 
 const STAGE_W = 800;
@@ -205,8 +206,37 @@ const LayerView: React.FC<{ layer: DynLayer }> = ({ layer }) => {
   const ref = useRef<HTMLImageElement>(null);
   const seenNonces = useRef<Set<number>>(new Set());
   const liveAnims = useRef<Map<number, Animation>>(new Map());
-  const [nat, setNat] = useState({ w: 0, h: 0 });
+  // Decoded bitmap + the placement inputs active when it became current.
+  // A file swap keeps showing this frame until the new file has decoded so
+  // a positioned _l master can't be laid out with stale natural dimensions
+  // (which exposed a black corner for a frame).
+  const [ready, setReady] = useState<ReadyFrame | null>(null);
   const timeScale = useDebugTimeScale();
+
+  // Decode new files off-DOM, then adopt them with their real dims.
+  useEffect(() => {
+    if (!layer.file) return;
+    const url = mediaUrl(layer.file);
+    if (!url) return;
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (cancelled) return;
+      setReady({
+        file: layer.file!,
+        w: img.naturalWidth,
+        h: img.naturalHeight,
+        xpos: layer.xpos ?? null,
+        ypos: layer.ypos ?? null,
+        orx: layer.orx ?? null,
+        ory: layer.ory ?? null,
+        afx: layer.afx,
+        afy: layer.afy,
+      });
+    };
+    img.src = url;
+    return () => { cancelled = true; };
+  }, [layer.file]);
 
   // Scripted pans/fades (time= on ev/newlay/named-layer tags): independent
   // WAAPI tracks for position and opacity, so a fade and a pan issued on
@@ -253,10 +283,22 @@ const LayerView: React.FC<{ layer: DynLayer }> = ({ layer }) => {
   }, []);
 
   if (!layer.file) return null;
-  const url = mediaUrl(layer.file);
-  if (!url) return null;
-  const positioned = layer.xpos != null || layer.ypos != null;
-  const pos = nat.w ? layerScreenPlacement(layer, nat.w, nat.h) : null;
+  const targetUrl = mediaUrl(layer.file);
+  if (!targetUrl) return null;
+  // Hold the previous decoded frame (with its own placement) until the new
+  // file is decoded; only 'target' adopts live layer xpos/ypos so pan tracks
+  // still retarget the base on same-file retargets.
+  const shown = resolveShownFrame(ready, layer.file);
+  let url = targetUrl;
+  let positioned = layer.xpos != null || layer.ypos != null;
+  let pos: { x: number; y: number } | null = null;
+  if (shown.kind === 'hold') {
+    url = mediaUrl(shown.frame.file) || targetUrl;
+    positioned = frameIsPositioned(shown.frame);
+    if (positioned) pos = layerScreenPlacement(shown.frame, shown.frame.w, shown.frame.h);
+  } else if (shown.kind === 'target') {
+    if (positioned) pos = layerScreenPlacement(layer, ready!.w, ready!.h);
+  }
   return (
     <img
       ref={ref}
@@ -264,16 +306,11 @@ const LayerView: React.FC<{ layer: DynLayer }> = ({ layer }) => {
       alt=""
       draggable={false}
       className="dyn-layer"
-      onLoad={(e) => {
-        const el = e.currentTarget;
-        if (el.naturalWidth !== nat.w || el.naturalHeight !== nat.h) {
-          setNat({ w: el.naturalWidth, h: el.naturalHeight });
-        }
-      }}
       style={{
         position: 'absolute',
         opacity: layer.opacity / 255,
         display: layer.visible ? 'block' : 'none',
+        visibility: shown.kind === 'wait' ? 'hidden' : 'visible',
         zIndex: layer.front ? 30 + layer.level : 10 + layer.level,
         ...(!positioned || !pos
           ? { left: 0, top: 0, width: STAGE_W, height: STAGE_H, objectFit: 'contain' }
