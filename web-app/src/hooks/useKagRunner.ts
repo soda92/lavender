@@ -346,9 +346,6 @@ export function useKagRunner(audio: {
   // Scene recollection (engine "scenemode"): play the memory_begin..memory_end
   // span of a scenario and return to the gallery scene tab at the end label.
   const sceneReplayRef = useRef<{ storage: string; endLabel: string } | null>(null);
-  // Slot addressed by a bare [ev] tag: follows the most recent ev_* tag, so
-  // [ev_*_l] ... [ev opacity=255] drives the large layer, not the base slot.
-  const lastEventSlotRef = useRef<'__event__' | '__event_l__'>('__event__');
   const [sceneReplay, setSceneReplay] =
     useState<{ storage: string; endLabel: string } | null>(null);
   const [galleryViewMode, setGalleryViewMode] = useState<'cg' | 'scenes' | 'music'>('cg');
@@ -595,7 +592,6 @@ export function useKagRunner(audio: {
     pendingChoicesRef.current = [];
     choiceOpenRef.current = false;
     setChoiceOptions(null);
-    lastEventSlotRef.current = '__event__';
     if (opts.seek != null) {
       // Rebuild the scene by silently replaying from the file start; the seek
       // pointer is the stop boundary handled inside runSlice.
@@ -1049,14 +1045,21 @@ export function useKagRunner(audio: {
 
     // ---- events / dynamic layers ----
     if (name === 'ev') {
-      // Variant scenes address layers via [ev file="..._l"] instead of tag
-      // names; pick the slot from the referenced file and remember it so
-      // the following [ev opacity=..]/[ev xpos=..] commands retarget it.
-      let slot = lastEventSlotRef.current;
-      const fileStem = args.file ? String(args.file).replace(/\.\w+$/, '') : null;
-      if (fileStem) slot = /_l$/i.test(fileStem) ? '__event_l__' : '__event__';
-      lastEventSlotRef.current = slot;
+      // The framework keeps ONE event layer; both [ev file=base] and
+      // [ev file=..._l] address it (large art is just a positioned file used
+      // for pans). Bare [ev opacity=..]/[ev xpos=..] tags adjust the current
+      // file. Loading a different file resets pan alignment unless the tag
+      // itself supplies a new position.
+      const slot = '__event__';
       const ly = upsertLayer(slot, { front: true, level: 6 });
+      if (args.file) {
+        const nextFile = String(args.file).replace(/\.\w+$/, '');
+        if (nextFile !== ly.file) {
+          ly.file = nextFile;
+          if (args.xpos == null) ly.xpos = null;
+          if (args.ypos == null) ly.ypos = null;
+        }
+      }
       applyLayerArgs(ly, args, argv);
       if (argv.includes('hide') || args.visible === 'false') ly.visible = false;
       else if (argv.includes('show')) ly.visible = true;
@@ -1081,17 +1084,19 @@ export function useKagRunner(audio: {
       return 'continue';
     }
     if (/^ev[_]/i.test(name) && mediaUrl(name)) {
-      // The framework event plugin keeps two addressed layers: ev_<stem>
-      // tags set the current CG on the base slot, while *_l tags drive the
-      // persistent "large" pan layer (transient named overlays such as
-      // akina1/scrl are created separately via [newlay]). Every tag re-shows
-      // its slot (tags after hideall/transitions restore visibility); an
-      // explicit opacity=0 is a transparent preload, not a hide.
-      const slot: '__event__' | '__event_l__' = /_l$/i.test(name) ? '__event_l__' : '__event__';
-      lastEventSlotRef.current = slot;
-      const ly = upsertLayer(slot, { file: name, front: true, level: 6, xpos: null, ypos: null });
+      // Shorthand for [ev file=<name>]: the single event layer swaps its
+      // artwork, so a base CG and its positioned "_l" pan art replace each
+      // other rather than stacking (transient overlays use [newlay]).
+      // Every tag re-shows the slot (tags after hideall/transitions restore
+      // visibility); an explicit opacity=0 is a transparent preload.
+      const ly = upsertLayer('__event__', { front: true, level: 6 });
+      if (ly.file !== name) {
+        ly.file = name;
+        // New artwork resets pan alignment unless this tag repositions it.
+        if (args.xpos == null) ly.xpos = null;
+        if (args.ypos == null) ly.ypos = null;
+      }
       applyLayerArgs(ly, args, argv);
-      ly.file = name; // re-addressing (e.g. 06a -> 06b) swaps the image
       if (!argv.includes('hide') && args.visible !== 'false') ly.visible = true;
       markCgSeen(name);
       commitStage();
@@ -1145,7 +1150,6 @@ export function useKagRunner(audio: {
     if (name === 'clearlayers') {
       world.layers = {};
       world.chars = {};
-      lastEventSlotRef.current = '__event__';
       commitStage();
       return 'continue';
     }
