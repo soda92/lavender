@@ -323,7 +323,7 @@ const SceneView: React.FC<{ stage: StageState; instant?: boolean }> = ({ stage, 
 const GameplayScreen: React.FC<Props> = ({ runner }) => {
   const {
     stage, stageTransition, speaker, typewriterText, dialogueText, isWaiting, textVisible,
-    advance, choiceOptions, chooseOption, chapterCard, video, onVideoEnded,
+    advance, choiceOptions, chooseOption, video, onVideoEnded,
     isAutoMode, toggleAuto,
     isFastForward, isSeeking, toggleFastForward, quickLoad, saveToSlot,
     windowHidden, setWindowHidden, sf,
@@ -413,13 +413,6 @@ const GameplayScreen: React.FC<Props> = ({ runner }) => {
             onVideoEnded();
           }}
         />
-      )}
-
-      {/* chapter card */}
-      {chapterCard && (
-        <div className="chapter-card" key={chapterCard.key}>
-          <div className="chapter-card-title">{chapterCard.title}</div>
-        </div>
       )}
 
       {/* choices: select.csv button skin (32,184 736x45) */}

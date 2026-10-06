@@ -40,50 +40,55 @@ func loadMacros(toks []kagToken) macroLib {
 	return lib
 }
 
-type macroFrame struct {
-	toks []kagToken
-	pos  int
-	mp   map[string]string
-}
-
-// expandMacros splices macro bodies into the token stream.
+// expandMacros splices macro bodies into the token stream. Each
+// invocation walks its OWN copy of the (shared) body tokens — macro
+// bodies are stored once and must never be mutated, otherwise the first
+// expansion leaks substituted values into every later invocation.
+// Attributes on a nested macro call are substituted through the
+// caller's parameter scope before becoming the inner scope.
 func (lib macroLib) expand(toks []kagToken) []kagToken {
-	frames := []macroFrame{{toks: toks}}
 	var out []kagToken
-	for len(frames) > 0 {
-		top := &frames[len(frames)-1]
-		if top.pos >= len(top.toks) {
-			frames = frames[:len(frames)-1]
-			continue
-		}
-		t := top.toks[top.pos]
-		top.pos++
-
-		if t.kind == "tag" {
-			if body, ok := lib[normalizeAttrKey(t.name)]; ok {
-				mp := map[string]string{}
-				for _, a := range t.args {
-					if a.Flag {
-						mp[normalizeAttrKey(a.Key)] = ""
-					} else {
-						mp[a.Key] = a.Val
+	var walk func(ts []kagToken, mp map[string]string)
+	walk = func(ts []kagToken, mp map[string]string) {
+		for _, t := range ts {
+			if t.kind == "tag" {
+				if body, ok := lib[normalizeAttrKey(t.name)]; ok {
+					inner := map[string]string{}
+					for _, a := range t.args {
+						if a.Flag {
+							inner[normalizeAttrKey(a.Key)] = ""
+							continue
+						}
+						v := a.Val
+						if mp != nil {
+							v = substMacro(v, mp)
+						}
+						inner[normalizeAttrKey(a.Key)] = v
 					}
+					walk(body, inner)
+					continue
 				}
-				frames = append(frames, macroFrame{toks: body, mp: mp})
+				if mp != nil && len(t.args) > 0 {
+					nt := t
+					nt.args = append([]kagArg(nil), t.args...)
+					for i := range nt.args {
+						if !nt.args[i].Flag {
+							nt.args[i].Val = substMacro(nt.args[i].Val, mp)
+						}
+					}
+					out = append(out, nt)
+					continue
+				}
+			} else if t.kind == "text" && mp != nil {
+				nt := t
+				nt.text = substMacroText(t.text, mp)
+				out = append(out, nt)
 				continue
 			}
-			if top.mp != nil {
-				for i := range t.args {
-					if !t.args[i].Flag {
-						t.args[i].Val = substMacro(t.args[i].Val, top.mp)
-					}
-				}
-			}
-		} else if t.kind == "text" && top.mp != nil {
-			t.text = substMacroText(t.text, top.mp)
+			out = append(out, t)
 		}
-		out = append(out, t)
 	}
+	walk(toks, nil)
 	return out
 }
 

@@ -241,7 +241,6 @@ export function useKagRunner(audio: {
   const [choiceOptions, setChoiceOptions] = useState<ChoiceOption[] | null>(null);
   const [bgmStem, setBgmStem] = useState<string | null>(null);
   const [currentVoice, setCurrentVoice] = useState('');
-  const [chapterCard, setChapterCard] = useState<{ title: string; key: number } | null>(null);
   const [video, setVideo] = useState<{ stem: string } | null>(null);
   const videoRef = useRef<{ stem: string } | null>(null);
   const [historyLog, setHistoryLog] = useState<HistoryItem[]>([]);
@@ -688,7 +687,6 @@ export function useKagRunner(audio: {
     choiceOpenRef.current = false;
     pendingChoicesRef.current = [];
     setChoiceOptions(null);
-    setChapterCard(null);
     setTextVisible(true); textVisibleRef.current = true;
     setSpeaker(''); speakerRef.current = '';
     setDialogueText(''); setTypewriterText('');
@@ -718,7 +716,6 @@ export function useKagRunner(audio: {
     setChoiceOptions(null);
     historyRef.current = [];
     setHistoryLog([]);
-    setChapterCard(null);
     setSideTab(null);
     setWindowHidden(false);
     const marker = {
@@ -1247,16 +1244,11 @@ export function useKagRunner(audio: {
       return 'continue';
     }
 
-    // ---- chapter cards ----
-    if (name === 'intermission') {
-      if (args.state === 'clear') setChapterCard(null);
-      else if (args.text) setChapterCard({ title: String(args.text), key: Date.now() });
-      return 'continue';
-    }
-    if (name === 'chaptitle') {
-      if (argv.includes('hide')) setChapterCard(null);
-      return 'continue';
-    }
+    // ---- chapter intermission ----
+    // The authentic chapter card is the ef_syoutitle_* full-screen layer
+    // shown by the 章タイトル macros in-scenario; these control tags need
+    // no standalone UI on our side.
+    if (name === 'intermission' || name === 'chaptitle') return 'continue';
 
     // ---- system navigation ----
     if (name === 'sysjump' && String(args.to || '') === 'title') {
@@ -1898,7 +1890,6 @@ export function useKagRunner(audio: {
     setSpeaker(data.speaker || '');
     setDialogueText(data.dialogueText || '');
     setTypewriterText(data.dialogueText || '');
-    setChapterCard(null);
     if (data.bgm) playBgmTrack(data.bgm);
     historyRef.current = data.historyLog || [];
     setHistoryLog(historyRef.current);
@@ -1958,7 +1949,7 @@ export function useKagRunner(audio: {
     stage, stageTransition, speaker, dialogueText, typewriterText,
     isWaiting, textVisible, advance, isSeeking,
     choiceOptions, chooseOption,
-    chapterCard, video, onVideoEnded: endVideo,
+    video, onVideoEnded: endVideo,
     bgmStem, currentVoice,
     historyLog, replayVoice,
     sideTab, setSideTab,
